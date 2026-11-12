@@ -1,0 +1,44 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "mini", "version": "1" },
+  "servers": [{ "url": "http://localhost/api" }],
+  "paths": {
+    "/api/table/{tableId}/view": {
+      "get": {
+        "tags": ["view"],
+        "summary": "Get view list",
+        "parameters": [{ "name": "tableId", "in": "path", "required": true, "schema": { "type": "string" } }]
+      },
+      "post": {
+        "tags": ["view"],
+        "summary": "Create view",
+        "parameters": [{ "name": "tableId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "type"],
+                "properties": {
+                  "name": { "type": "string", "description": "View name" },
+                  "type": { "type": "string", "description": "View type" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/base/{baseId}/collaborators": {
+      "get": {
+        "tags": ["base"],
+        "summary": "List base collaborators",
+        "parameters": [
+          { "name": "baseId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "skip", "in": "query", "required": false, "schema": { "type": "number" } }
+        ]
+      }
+    }
+  }
+}
