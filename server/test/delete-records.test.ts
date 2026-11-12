@@ -13,6 +13,14 @@ it("rejects filter plus recordIds", async () => {
   expect(r.isError).toBe(true);
   expect(stub.calls.some((x) => x.method === "DELETE")).toBe(false);
 });
+it("encodes a single id as recordIds[] so the CE query parser yields an array", async () => {
+  stub = await startStubTeable({ "DELETE /api/table/tbl1/record": () => ({ body: {} }) });
+  const c = await connectClient(stub.url);
+  await c.callTool({ name: "delete-records", arguments: { tableId: "tbl1", recordIds: ["rec1"] } });
+  const call = stub.calls.find((x) => x.path === "/api/table/tbl1/record")!;
+  expect(call.query.getAll("recordIds[]")).toEqual(["rec1"]);
+  expect(call.query.has("recordIds")).toBe(false);
+});
 it("deletes by ids and by mapped filter", async () => {
   stub = await startStubTeable({ "GET /api/table/tbl1/field": () => ({ body: fields }),
     "DELETE /api/table/tbl1/record": () => ({ body: {} }),
@@ -20,7 +28,7 @@ it("deletes by ids and by mapped filter", async () => {
   const c = await connectClient(stub.url);
   expect(parseText(await c.callTool({ name: "delete-records", arguments: { tableId: "tbl1", recordIds: ["rec1", "rec2"] } }) as any))
     .toEqual({ success: true, deletedCount: 2 });
-  expect(stub.calls.find((x) => x.path === "/api/table/tbl1/record")!.query.getAll("recordIds")).toEqual(["rec1", "rec2"]);
+  expect(stub.calls.find((x) => x.path === "/api/table/tbl1/record")!.query.getAll("recordIds[]")).toEqual(["rec1", "rec2"]);
   expect(parseText(await c.callTool({ name: "delete-records", arguments: { tableId: "tbl1", filter: { fieldId: "name", operator: "is", value: "A" } } }) as any))
     .toEqual({ success: true, deletedCount: 3 });
   expect(stub.calls.at(-1)!.body).toEqual({ tableId: "tbl1", filter: { fieldId: "fldName0001", operator: "is", value: "A" } });

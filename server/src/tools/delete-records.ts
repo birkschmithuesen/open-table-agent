@@ -16,7 +16,7 @@ export const tool: ToolDef = {
       throw new ToolInputError("Provide exactly one of recordIds or filter");
     }
     if (recordIds) {
-      await client.request("DELETE", `/table/${encodeURIComponent(tableId)}/record`, { query: { recordIds } });
+      await client.request("DELETE", `/table/${encodeURIComponent(tableId)}/record`, { query: { "recordIds[]": recordIds } });
       return { success: true, deletedCount: recordIds.length };
     }
     const fields = await loadFields(client, tableId);

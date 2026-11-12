@@ -37,12 +37,12 @@ export const tool: ToolDef = {
       const count = res.data?.data?.updatedCount ?? res.data?.updatedCount ?? 0;
       return { success: true, updatedCount: count };
     }
-    if (!header.some((h: string) => h.toLowerCase() === "recordid")) {
+    if (!header.includes("recordId")) {
       throw new ToolInputError("header must contain recordId");
     }
     assertRectangular(header, records);
     const fields = await loadFields(client, tableId);
-    const idCol = header.findIndex((h: string) => h.toLowerCase() === "recordid");
+    const idCol = header.indexOf("recordId");
     const fieldIds = header.map((h: string, i: number) => (i === idCol ? "" : resolveHeader(fields, [h])[0]));
     const sent: Record<string, unknown>[] = [];
     const body = records.map((row: unknown[]) => {

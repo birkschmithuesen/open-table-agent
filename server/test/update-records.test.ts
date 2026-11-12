@@ -31,7 +31,15 @@ it("mode B: '' leaves unchanged, null clears", async () => {
   await c.callTool({ name: "update-records", arguments: { tableId: "tbl1", header: ["recordId", "Name", "Count"], records: [["rec1", "", null]] } });
   expect(stub.calls.at(-1)!.body).toEqual({ fieldKeyType: "id", typecast: true, records: [{ id: "rec1", fields: { fldCount001: null } }] });
 });
-it("rejects mixed modes", async () => {
+it("mode B: recordId header is matched exactly (case-sensitive)", async () => {
+  stub = await startStubTeable({ "GET /api/table/tbl1/field": () => ({ body: fields }),
+    "PATCH /api/table/tbl1/record": (c) => ({ body: (c.body as any).records }) });
+  const c = await connectClient(stub.url);
+  const r = await c.callTool({ name: "update-records", arguments: { tableId: "tbl1", header: ["RecordID", "Count"], records: [["rec1", 2]] } });
+  expect(r.isError).toBe(true);
+  expect(stub.calls.some((x) => x.method === "PATCH")).toBe(false);
+});
+it("rejects mixed modes",async () => {
   stub = await startStubTeable({ "GET /api/table/tbl1/field": () => ({ body: fields }) });
   const c = await connectClient(stub.url);
   const r = await c.callTool({ name: "update-records", arguments: { tableId: "tbl1", filter: { fieldId: "Name", operator: "is", value: "A" },
