@@ -4,7 +4,8 @@ Date: 2026-11-12. Card: t_bd29c389. Status: design, no product code yet.
 Binding input: `docs/decisions.md` (8 decisions, Birk 2026-11-12). They are not reopened here.
 
 Notation: **[src: …]** names the source a decision rests on. **ANNAHME:** marks a fact that was not
-verified in this run, plus what must be checked. **FRAGE:** marks an open question for Birk (section 12).
+verified in this run, plus what must be checked. **D-n:** a decision taken by Birk/Robo on a former open question
+(section 12).
 
 ## 1. Goal and scope
 
@@ -36,6 +37,8 @@ MCP server (bearer tokens only); the 13th closed tool `query-data` (not in the p
 | Dockerfile `dockers/teable/Dockerfile`: stages `deps` (`node:24.22.2-bookworm`, corepack pnpm@12.11.2, `pnpm fetch/install`, prisma generate), `builder`, `post-builder`, `gosu` (`tianon/gosu:1.19`), `runner` (`node:24.22.2-bookworm-slim`); uses `COPY --link` | grep |
 | Teable pins `prisma` / `@prisma/client` 6.2.1 with `prisma-client-js` (`packages/db-main-prisma/package.json:60-61`, schema.prisma) — engines are downloaded from `binaries.prisma.sh` | read source |
 | Egress: `https://binaries.prisma.sh/` **times out** for uid birk | `curl --max-time 10` → exit 28 |
+| Prisma engines-version in upstream lock: `6.2.0-14.4123509d24aa4dede1e864b46351bf2790323b69` | `grep engines-version pnpm-lock.yaml` (lines 9281, 24940) |
+| The download broker `/usr/local/bin/hermes-download` reaches `binaries.prisma.sh`. Checksum files exist at `…/all_commits/4123509d…/debian-openssl-3.0.x/{libquery_engine.so.node.gz,schema-engine.gz}.sha256`, each with the content `<hex>  ./debian-openssl-3.0.x/<file>.gz` (query engine `d75ffb69…ea188`, schema engine `17f75cc8…fb767`). The broker needs the output directory to exist already. | `hermes-download … --unverified -o .scratch/prisma-probe/…` → exit 0 |
 | Redis is mandatory for CE (`BACKEND_CACHE_REDIS_URI`, `env.validation.schema.ts:115-118`) | read source |
 | Host: git 2.39.5, Python 3.11.15, GNU Make 4.3, podman 4.3.1 (no images), `/usr/local/bin/docker-compose`, no psql/redis binaries; `/var/lib/admin-jobs-images/` does not exist | command output |
 | `teableio/agent-skills` HEAD `01408885444a66f68b721d6eaae70159d3db7e3d` (2026-11-11), MIT ("Copyright (c) 2026"); 23 topic docs in `skills/teable-assistant-ops/api-reference/*.md` (≈123 kB) | `git clone` |
@@ -253,7 +256,7 @@ dedicated read-level permission for exactly this (`query_data`, token scope leve
 role that has `base|read` except Commenter, whom Teable deliberately denies it. The closed EE route uses it
 too [src: closed `backend-ee/src/features/override/controller/base.controller.ts`]. Using `base|read` would give
 Commenters SQL access that Teable withholds from them. Consequence for setup: the agent's token must include the
-`base|query_data` scope (docs/hermes.md). FRAGE-1 (section 12) lets Birk override this.
+`base|query_data` scope (docs/hermes.md). **Decided (D-1, section 12):** `base|query_data` stays.
 
 Why a new controller file instead of a method on `BaseController`: `base.controller.ts` is a large, frequently
 changing upstream file. A new file never conflicts on sync; only the two one-line module edits and the ledger
@@ -269,8 +272,13 @@ Python 3.11 stdlib only (host has 3.11.15; testable with `unittest`, no deps).
 
 ```
 scripts/sync-upstream.py [--upstream-url URL] [--ref develop | --tag TAG] [--dry-run]
-                         [--build] [--work-dir .work] [--lock upstream.lock.json] [--patches patches]
+                         [--build] [--podman-arg ARG]... [--work-dir .work] [--lock upstream.lock.json]
+                         [--patches patches]
 ```
+
+`--podman-arg` (repeatable) is inserted verbatim into the `podman build` command before the context path. It is
+needed for the Prisma engine injection (section 8, D-2), e.g. `--podman-arg=--volume=<dir>:/ota-prisma:ro`
+`--podman-arg=--env=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/…`. It does not change the upstream Dockerfile.
 
 - Default URL `https://github.com/teableio/teable.git` (github.com reachable; codeload is not and is not used).
 - Fetch: `git fetch <url> <ref>` into a bare cache `.work/upstream.git` (created on first run). The script
@@ -377,8 +385,8 @@ the MUST. Test files are relative to their chain root.
   default `/mnt/HC_Volume_106183673/projekte/teable-fork/.git`. If the path or the sha is missing, the test fails
   with a message; it is never skipped. Runtime behaviour of the controller (types, permission, rows) is proven
   in D. ANNAHME: no CE type check runs before D — the Dockerfile builds with `NEST_BUILD_TYPE_CHECK=0`, so Chain B
-  must also run `tsc --noEmit` on the patched backend if a usable install exists (B's Task 3; may be blocked by
-  FRAGE-2).
+  must also run `tsc --noEmit` on the patched backend if a usable install exists (B's Task 3; `pnpm install
+  --ignore-scripts` avoids the Prisma engine download, see D-2).
 - **C (unit, offline):** each test builds a throwaway "upstream" git repo in a temp dir (file URL), a patch made
   with `git format-patch` from it, and runs the script as a subprocess. A mutation fixture breaks one context line
   to force the conflict.
@@ -410,17 +418,49 @@ and the patched image tag read from `upstream.lock.json`. Env: `PRISMA_DATABASE_
 base + table with fields `Name` (text) and `Count` (number), create token A with scopes incl. `base|query_data`,
 `record|*`, `table|read`, `field|read`; sign up user B with no access to that base, token B. ANNAHME: sign-up and
 access-token endpoints and their bodies (`packages/openapi/src/auth/signup.ts`, `access-token/create.ts`) and that
-sign-up needs no email verification on CE — verify in D Task 2 against the source before writing the bootstrap.
+sign-up needs no email verification on CE — verify in Chain D Task D3 against the source before writing the bootstrap.
+
+**Prisma engines (D-2).** Egress to `binaries.prisma.sh` is **not** requested. The two engines for
+engines-version `4123509d24aa4dede1e864b46351bf2790323b69`, platform `debian-openssl-3.0.x`, come through the download
+broker:
+1. Fetch `<file>.gz.sha256` with `hermes-download <url> --unverified -o <path>`.
+2. Fetch `<file>.gz` with `hermes-download <url> --sha256 <hex from step 1> -o <path>` (exit 4 on mismatch).
+3. Gunzip into a cache outside git: `.work/prisma-engines/4123509d…/` (ignored), as
+   `libquery_engine-debian-openssl-3.0.x.so.node` and `schema-engine-debian-openssl-3.0.x` (+x).
+
+Base URL `https://binaries.prisma.sh/all_commits/<hash>/debian-openssl-3.0.x/`, files `libquery_engine.so.node.gz`
+and `schema-engine.gz` (layout measured, section 2).
+
+Injection into the unmodified upstream Dockerfile goes through `sync-upstream.py --podman-arg`: a read-only build
+volume carrying the cache, plus `PRISMA_QUERY_ENGINE_LIBRARY` / `PRISMA_SCHEMA_ENGINE_BINARY` pointing into it.
+ANNAHME (two unknowns, measured first in Chain D Task 1 before the full build):
+- (i) Prisma 6.2.1 `prisma generate` honours these env vars and makes no download;
+- (ii) `podman build --env` / `--volume` reach the Dockerfile's `RUN` steps in podman 4.3.1.
+
+Fallbacks, in order:
+- (a) a local `PRISMA_ENGINES_MIRROR` (`python3 -m http.server` over the cache in mirror layout, with
+  `podman build --network=host`);
+- (b) extract the engines from an upstream Teable image fetched via image-holen.
+
+This is not a blocker for Chains A–C.
+
+**image-holen (D-3).** The admin job (merge card t_296d1445, chain t_ba874608) accepts `ghcr.io/…` and `docker.io/…`
+refs with a tag or `@sha256:`. Submit: `~/.hermes/profiles/birk/scripts/admin-job-submit.py image-holen <ref> --key
+<unique-key>`. Result: `/var/spool/admin-jobs/done/<key>.json(l)`, tarball under `/var/lib/admin-jobs-images/`, then
+`podman load -i <tarball>`. It is live only after Birk's admin install of that merge. Until then Chain D blocks with
+`kanban_block(kind="dependency")` on t_296d1445; it does not fail.
 
 Admin steps for Birk (preconditions of Chain D, not agent work):
-1. Review, merge and install the `image-holen` admin job (chain t_ba874608).
-2. Approve 5 fetches: `docker.io/library/node:24.22.2-bookworm`, `docker.io/library/node:24.22.2-bookworm-slim`,
-   `docker.io/tianon/gosu:1.19`, `docker.io/library/postgres:15.4`, `docker.io/library/redis:7.2.4`
-   (submitted by an agent with `admin-job-submit.py image-holen <ref> --key <key>`; Birk taps each).
-3. Resolve FRAGE-2 (prisma engine download host), otherwise the image build fails in `prisma generate`.
+1. Review, merge (card t_296d1445) and admin-install the `image-holen` job.
+2. Approve 5 fetches (taps), submitted by the Chain D agent: `docker.io/library/node:24.22.2-bookworm`,
+   `docker.io/library/node:24.22.2-bookworm-slim`, `docker.io/tianon/gosu:1.19`, `docker.io/library/postgres:15.4`,
+   `docker.io/library/redis:7.2.4`. A 6th only if fallback (b) is needed: an upstream Teable image (`ghcr.io/teableio/…`).
 
 ANNAHME: podman 4.3.1 (buildah 1.28) builds `COPY --link` and the build container reaches `registry.npmjs.org`
-— D Task 1 is a build probe that checks this before anything else.
+— Chain D Task D1 (its probe Containerfile uses `COPY --link`) checks this before the full build.
+
+Chain D task order: D0 gate on t_296d1445 + 5 image fetches → D1 Prisma engines + injection measurement → D2 real
+sync + patched image build → D3 pod + bootstrap → D4 acceptance tests.
 
 ## 9. Part 5 — Hermes wiring (`docs/hermes.md`, Chain A)
 
@@ -456,10 +496,10 @@ Content to write:
 
 | Path | Owner |
 |---|---|
-| `Makefile`, `docs/superpowers/**`, `docs/spec.md`, `docs/plan.md`, `docs/decisions.md` | this run (frozen afterwards; changes go through a new card) |
+| `Makefile`, `.gitignore` (root: `.scratch/`, `.work/`), `docs/superpowers/**`, `docs/spec.md`, `docs/plan.md`, `docs/decisions.md` | this run (frozen afterwards; changes go through a new card) |
 | `server/**`, `mk/server.mk`, `docs/hermes.md`, `LICENSE` | Chain A |
 | `patches/**`, `mk/patches.mk` | Chain B |
-| `scripts/sync-upstream.py`, `scripts/tests/**`, `mk/sync.mk`, `.gitignore` (root; `.work/`) | Chain C |
+| `scripts/sync-upstream.py`, `scripts/tests/**`, `mk/sync.mk` | Chain C |
 | `e2e/**`, `mk/e2e.mk`, `upstream.lock.json` (first real sync), `README.md` (status line) | Chain D |
 
 ## 11. Behaviour taken from the closed reference
@@ -488,15 +528,23 @@ Behaviour only; no code copied. Paths are relative to `/home/birk/scratch/teable
 | `update-records` two exclusive modes, filter mode via `/v2/tables/updateRecords`, `""` = unchanged / `null` = clear in fixed-record mode | `packages/ai-tools/src/tools/update-records/execute.ts` |
 | `delete-records` ids (1–1000) xor filter, filter mode via `/v2/tables/deleteRecords` | `packages/ai-tools/src/tools/delete-records/execute.ts` |
 
-## 12. Open questions
+## 12. Decided
 
-- **FRAGE-1:** The brief says "base read permission" for the SQL route; this spec uses `base|query_data`
-  (section 5.2: Commenters have `base|read` but Teable denies them `query_data`). Keep `base|query_data`?
-  Default if unanswered: `base|query_data`.
-- **FRAGE-2:** `binaries.prisma.sh` is unreachable for uid birk (measured 2026-11-12). Every build of Teable
-  (Dockerfile `deps`/`post-builder` stages run `prisma generate`; Prisma 6.2.1 downloads engines there) fails
-  without it. Options: (i) Birk allows egress to `binaries.prisma.sh`; (ii) the engines come from an image-holen
-  fetch of an upstream Teable image and are injected via `PRISMA_ENGINES_MIRROR` / `PRISMA_QUERY_ENGINE_LIBRARY`
-  (ANNAHME: Prisma 6.2.1 honours these during generate — unverified). Chain D Task 1 cannot pass until one is chosen.
-- **FRAGE-3:** Does the `image-holen` job accept the 5 refs in section 8 (all `docker.io/…`), and what is the exact
-  submit syntax after installation? (The submit script requires `--key`.)
+Former open questions FRAGE-1..3, answered 2026-11-12 02:30 by Robo for Birk (operator note on card t_bd29c389;
+technical decisions, binding). No open questions remain.
+
+- **D-1 (was FRAGE-1):** the SQL route keeps `@Permissions('base|query_data')`. Reason: it matches Teable's own
+  permission model, and Commenters must not run SQL. Affects section 5.2 (patch), section 9 (token scopes) and MUST P2.
+- **D-2 (was FRAGE-2):** no egress request for `binaries.prisma.sh`. The Prisma 6.2.1 engines (engines-version
+  `4123509d24aa4dede1e864b46351bf2790323b69`, `debian-openssl-3.0.x`) are fetched through `hermes-download`. Each is
+  verified against the `.sha256` file Prisma publishes next to it (that file is fetched with `--unverified`), stored
+  in a cache outside git, and injected into the build via `PRISMA_QUERY_ENGINE_LIBRARY` /
+  `PRISMA_SCHEMA_ENGINE_BINARY` or a local `PRISMA_ENGINES_MIRROR`. Whether 6.2.1's `generate` honours these is
+  unverified, so Chain D Task 1 measures it first. Fallback: extract the engines from an upstream Teable image fetched
+  via image-holen. Not a blocker. Affects section 6 (`--podman-arg`), section 8 and Chain D Task 1.
+- **D-3 (was FRAGE-3):** image-holen (chain t_ba874608, merge card t_296d1445, in review) accepts `ghcr.io/…` and
+  `docker.io/…` refs with a tag or `@sha256:`. Submit with `~/.hermes/profiles/birk/scripts/admin-job-submit.py
+  image-holen <ref> --key <unique-key>`. The result is in `/var/spool/admin-jobs/done/<key>.json(l)`, the tarball
+  under `/var/lib/admin-jobs-images/`, then `podman load -i <tarball>`. It is live only after Birk's admin install of
+  that merge. Chain D's first step is `kanban_block(kind="dependency")` on t_296d1445 rather than failing.
+  Affects section 8 and Chain D.

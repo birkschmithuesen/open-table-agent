@@ -56,7 +56,7 @@ mk/patches.mk                    B
 scripts/sync-upstream.py         C
 scripts/tests/test_sync_upstream.py, scripts/tests/fixtures.py   C
 mk/sync.mk                       C
-.gitignore                       C   (.work/)
+.gitignore                       (done, this run)  .scratch/ and .work/ — no chain edits it
 e2e/stack.py, e2e/bootstrap.py   D
 e2e/package.json, package-lock.json, tsconfig.json, vitest.config.ts     D
 e2e/tests/acceptance.e2e.test.ts, e2e/tests/test_sync_real.py            D
@@ -69,7 +69,7 @@ README.md                        D   (status line)
 
 ## Chain 0 — this run (done)
 
-Owned: `Makefile`, `docs/superpowers/**`, `docs/spec.md`, `docs/plan.md`. Base: `main`.
+Owned: `Makefile`, `.gitignore` (`.scratch/`, `.work/`), `docs/superpowers/**`, `docs/spec.md`, `docs/plan.md`. Base: `main`.
 
 Verification (run in this run, 2026-11-12):
 
@@ -1304,7 +1304,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 Note: `git apply --cached` with `GIT_INDEX_FILE` writes only the temporary index. The upstream repo's own index and working tree are not touched. ANNAHME: `git apply --cached` accepts an mbox (format-patch) file. It does: it skips the mail header. Step 4 of B2 confirms this.
-- [ ] **Step 2: write** `patches/BASE` and `patches/README.md`. The README states: the AGPL-3.0 sentence from spec §5.2; the base; how to regenerate (clone `--shared` into `.work/`, `git checkout <BASE>`, `git am patches/*.patch`, edit, `git format-patch -o patches/ <BASE>`); and that FRAGE-1 decides the permission.
+- [ ] **Step 2: write** `patches/BASE` and `patches/README.md`. The README states: the AGPL-3.0 sentence from spec §5.2; the base; how to regenerate (clone `--shared` into `.work/`, `git checkout <BASE>`, `git am patches/*.patch`, edit, `git format-patch -o patches/ <BASE>`); and that the permission `base|query_data` is decision D-1 (spec §12: Commenters must not run SQL).
 - [ ] **Step 3: run, expect FAIL** — `make test patches` → `test_touches_only_allowlisted_paths … ERROR: no patches/NNNN-*.patch found` (and the same for apply/route); exit 2.
 - [ ] **Step 4: commit** `test(patches): add patch-series checks, BASE and AGPL README`.
 
@@ -1314,7 +1314,7 @@ Note: `git apply --cached` with `GIT_INDEX_FILE` writes only the temporary index
 
 **Interfaces:**
 - Consumes: CE `BaseSqlExecutorService.executeQuerySql(baseId: string, sql: string, opts?: { parameters?: ReadonlyArray<unknown>; structuredCoverage?: boolean; … })` (`base-sql-executor.service.ts:349`), `Permissions` (`../auth/decorators/permissions.decorator`), `ZodValidationPipe` (`../../zod.validation.pipe`).
-- Produces: HTTP contract `POST /api/base/:baseId/sql-query`, body `{sql: string (min 1), parameters?: unknown[]}`, response `200 {rows: object[]}`. Guard `base|query_data`. Used by server A6 and e2e D3.
+- Produces: HTTP contract `POST /api/base/:baseId/sql-query`, body `{sql: string (min 1), parameters?: unknown[]}`, response `200 {rows: object[]}`. Guard `base|query_data`. Used by server A6 and e2e D4.
 
 - [ ] **Step 1: scratch tree** — `git clone --shared --no-checkout /mnt/HC_Volume_106183673/projekte/teable-fork .work/b-upstream`, then `git -C .work/b-upstream checkout --detach fc4126e945a212aa637c4134c373416df69bb982`. Make sure `.work/` is never staged: `git status --porcelain` must not list it; it is ignored after Chain C merges. Until then, add files only by explicit path.
 - [ ] **Step 2: write the controller** `.work/b-upstream/apps/nestjs-backend/src/features/base-sql-executor/base-sql-query.controller.ts` (AGPL file inside the patch):
@@ -1376,7 +1376,7 @@ ANNAHME: `executeQuerySql`'s generic parameter and the `parameters` option name 
 
 **Files:** none committed (the result goes into the commit message of B2's follow-up or into the chain's handoff note).
 
-- [ ] **Step 1:** `pnpm --dir .work/b-upstream install --frozen-lockfile --ignore-scripts` (registry.npmjs.org reachable; `--ignore-scripts` avoids the prisma engine download, FRAGE-2).
+- [ ] **Step 1:** `pnpm --dir .work/b-upstream install --frozen-lockfile --ignore-scripts` (registry.npmjs.org reachable; `--ignore-scripts` avoids the prisma engine download; spec D-2).
 - [ ] **Step 2:** `pnpm --dir .work/b-upstream -F @teable/backend exec tsc --noEmit -p tsconfig.json`. Expected: no error in `base-sql-query.controller.ts`, `base-sql-executor.module.ts` or `base.module.ts`. Pre-existing errors elsewhere (e.g. a missing generated prisma client) are listed but not fixed. If the generated prisma client is missing, the command reports `Cannot find module '@prisma/client'`-type errors in unrelated files. In that case filter: `grep -E "base-sql-query|base-sql-executor.module|base/base.module"` on the output must print nothing.
   ANNAHME: the backend package name is `@teable/backend` (check `apps/nestjs-backend/package.json` `name`).
 - [ ] **Step 3:** if Step 1 or 2 cannot run, report the reason in the chain's final message. Chain D's image build is then the first compile of the patch.
@@ -1385,7 +1385,7 @@ ANNAHME: `executeQuerySql`'s generic parameter and the `parameters` option name 
 
 ## Chain C — sync script
 
-**Owned files:** `scripts/sync-upstream.py`, `scripts/tests/**`, `mk/sync.mk`, `.gitignore`. **Base:** `main` after this plan's commit. **Test command:** `make test` (targeted `make test scripts`). **Size:** M. **Depends on:** nothing (tests build synthetic repos; real patches are exercised in D4).
+**Owned files:** `scripts/sync-upstream.py`, `scripts/tests/**`, `mk/sync.mk`. (The root `.gitignore` already ignores `.work/`; it was written in the planning run and is not edited by this chain.) **Base:** `main` after this plan's commit. **Test command:** `make test` (targeted `make test scripts`). **Size:** M. **Depends on:** nothing (tests build synthetic repos; real patches are exercised in D4).
 
 **CLI contract (spec §6):**
 ```
@@ -1405,7 +1405,7 @@ scripts/sync-upstream.py [--upstream-url URL] [--ref REF | --tag TAG] [--dry-run
 
 ### Task C1: Fixtures, clean apply, lock file
 
-**Files:** Create `scripts/sync-upstream.py`, `scripts/tests/__init__.py` (empty), `scripts/tests/fixtures.py`, `scripts/tests/test_sync_upstream.py`, `mk/sync.mk`, `.gitignore`.
+**Files:** Create `scripts/sync-upstream.py`, `scripts/tests/__init__.py` (empty), `scripts/tests/fixtures.py`, `scripts/tests/test_sync_upstream.py`, `mk/sync.mk`.
 
 **Interfaces:**
 - Produces, in `scripts/tests/fixtures.py`:
@@ -1423,7 +1423,6 @@ endif
 test-sync:
 	python3 -m unittest discover -s scripts/tests -t . -v
 ```
-`.gitignore`: `.work/` and `.scratch/`.
 
 - [ ] **Step 1: failing test** (C1)
 ```python
@@ -1633,20 +1632,28 @@ Catch `EnvError` → stderr `sync-upstream: <msg>`, exit 2.
                      env_extra={"OTA_PODMAN": "false"})
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
         self.assertFalse(json.loads((self.tmp / "upstream.lock.json").read_text())["image"]["built"])
+
+    def test_podman_args_pass_through(self):
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches),
+                     "--podman-arg=--volume=/x:/ota-prisma:ro", "--podman-arg=--env=A=b")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout, r"(?m)^BUILD podman build -f dockers/teable/Dockerfile -t \S+ --volume=/x:/ota-prisma:ro --env=A=b \S+$")
 ```
 Implementation notes:
+- `--podman-arg` is `action="append"`. Its values are inserted verbatim after `-t <tag>` and before the context path, both in the printed `BUILD` line and in the executed command. This is needed for the Prisma engine injection (spec §8, D-2).
 - `--ref` and `--tag` go in an argparse mutually exclusive group.
 - The podman binary comes from env `OTA_PODMAN` (default `podman`), so the test needs neither containers nor podman.
 - `run_sync` gains `env_extra`.
 - `(self.tmp / "empty")` is created empty in the test (`mkdir`).
-- [ ] **Step 2: run, expect FAIL → implement → PASS** — `make test scripts` → `Ran 7 tests … OK`; `make test: OK (test-sync)`.
-- [ ] **Step 3: commit** `feat(sync): support pinned tags, usage errors and build exit code`.
+- [ ] **Step 2: run, expect FAIL → implement → PASS** — `make test scripts` → `Ran 8 tests … OK`; `make test: OK (test-sync)`.
+- [ ] **Step 3: mutation** — drop the `--podman-arg` values from the printed/executed command → `test_podman_args_pass_through` FAIL. Revert.
+- [ ] **Step 4: commit** `feat(sync): support pinned tags, podman args, usage errors and build exit code`.
 
 ---
 
 ## Chain D — end-to-end (after A, B, C are merged into `main`)
 
-**Owned files:** `e2e/**`, `mk/e2e.mk`, `upstream.lock.json`, `README.md`. **Base:** `main` after A, B, C are merged. **Test command:** `make test` (must stay green; D adds nothing to `TEST_TARGETS`) and `make e2e`. **Size:** M–L (long image build). **External gates:** admin steps 1–3 (below) and FRAGE-2.
+**Owned files:** `e2e/**`, `mk/e2e.mk`, `upstream.lock.json`, `README.md`. **Base:** `main` after A, B, C are merged. **Test command:** `make test` (must stay green; D adds nothing to `TEST_TARGETS`) and `make e2e`. **Size:** M–L (long image build). **External gates:** image-holen live (merge card t_296d1445 + Birk's admin install) and the 5 image taps (D-3). Prisma engines come via `hermes-download` (D-2) and need no admin step.
 
 `mk/e2e.mk`
 ```make
@@ -1664,11 +1671,85 @@ e2e/node_modules/.ota-stamp: e2e/package-lock.json
 	touch $@
 ```
 
-### Task D1: Real sync + image build probe (E4)
+### Task D0: Gate on image-holen, then fetch the 5 base images (D-3)
 
-**Preconditions:** admin steps 1–2 done (the 5 images are loaded: `podman images` lists node 24.22.2 bookworm and bookworm-slim, `tianon/gosu:1.19`, `postgres:15.4`, `redis:7.2.4`); FRAGE-2 resolved.
+**Files:** none.
 
-**Files:** Create `e2e/__init__.py`, `e2e/tests/__init__.py`, `e2e/tests/test_sync_real.py`, `mk/e2e.mk`; commit `upstream.lock.json`.
+- [ ] **Step 1: block, don't fail.** The **first action of Chain D** is to check whether image-holen is live: `ls /var/lib/admin-jobs-images/`. If the directory is missing (the job is not installed), call `kanban_block(kind="dependency")` on the image-holen merge card **t_296d1445** with the reason "Chain D needs image-holen installed (Birk admin step)", and stop. Do not fail the card. Resume when the block is lifted.
+- [ ] **Step 2: submit 5 fetches**, one call each, with unique keys:
+  - `~/.hermes/profiles/birk/scripts/admin-job-submit.py image-holen docker.io/library/node:24.22.2-bookworm --key ota-node-bookworm`
+  - `… image-holen docker.io/library/node:24.22.2-bookworm-slim --key ota-node-slim`
+  - `… image-holen docker.io/tianon/gosu:1.19 --key ota-gosu`
+  - `… image-holen docker.io/library/postgres:15.4 --key ota-postgres`
+  - `… image-holen docker.io/library/redis:7.2.4 --key ota-redis`
+
+  Expected: each prints the submitted request. Birk taps each on his phone.
+- [ ] **Step 3: wait for results.** Wait for `/var/spool/admin-jobs/done/<key>.json` or `.jsonl` for each of the 5 keys. Until they exist, `kanban_block(kind="dependency")` again on t_296d1445 with the reason "waiting for 5 image-holen taps".
+- [ ] **Step 4: load** — `podman load -i /var/lib/admin-jobs-images/<tarball>` once per tarball named in each result file. Verify: `podman images --format '{{.Repository}}:{{.Tag}}'` lists all 5 refs.
+
+### Task D1: Prisma engines via the download broker + injection measurement (D-2)
+
+**Files:** Create `e2e/prisma_engines.py`, `e2e/probe/Containerfile.prisma`, `e2e/probe/schema.prisma`, `e2e/__init__.py`, `mk/e2e.mk` (as in the chain header).
+
+**Interfaces:**
+- `python3 e2e/prisma_engines.py fetch [--cache .work/prisma-engines]` is idempotent. For each `F` in `libquery_engine.so.node.gz` and `schema-engine.gz`:
+  1. `hermes-download <BASE>/<F>.sha256 --unverified -o <cache>/all_commits/<H>/debian-openssl-3.0.x/<F>.sha256`
+  2. Parse the first hex field of that file.
+  3. `hermes-download <BASE>/<F> --sha256 <hex> -o <cache>/all_commits/<H>/debian-openssl-3.0.x/<F>` (broker exit 4 = checksum mismatch → the script exits 1).
+  4. Gunzip to `<cache>/engines/libquery_engine-debian-openssl-3.0.x.so.node` and `<cache>/engines/schema-engine-debian-openssl-3.0.x` (chmod 755).
+
+  `<BASE>` = `https://binaries.prisma.sh/all_commits/<H>/debian-openssl-3.0.x`, `H = 4123509d24aa4dede1e864b46351bf2790323b69`. Directories are created before each download (the broker needs them). Existing files whose gz sha256 matches are not re-fetched.
+
+  Output: `ENGINE query <path> gz_sha256=<hex>`, `ENGINE schema <path> gz_sha256=<hex>`, and one line `PODMAN_ARGS <args>` listing the `--podman-arg=` values for mode `env`:
+  - `--volume=<abs cache>/engines:/ota-prisma:ro`
+  - `--env=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/libquery_engine-debian-openssl-3.0.x.so.node`
+  - `--env=PRISMA_SCHEMA_ENGINE_BINARY=/ota-prisma/schema-engine-debian-openssl-3.0.x`
+- `python3 e2e/prisma_engines.py serve --port 8765` (fallback a): serves `<cache>` over `http://127.0.0.1:8765` (mirror layout `all_commits/<H>/debian-openssl-3.0.x/…`). It is used by `build-with-mirror`. That subcommand starts the server in a thread, runs `scripts/sync-upstream.py --build --podman-arg=--network=host --podman-arg=--env=PRISMA_ENGINES_MIRROR=http://127.0.0.1:8765`, and stops the server, all in one process (no shell backgrounding).
+- Measured facts (spec §2): the `.sha256` files exist at `<BASE>/<F>.sha256` with the content `<hex>  ./debian-openssl-3.0.x/<F>`.
+
+- [ ] **Step 1: fetch** — `python3 e2e/prisma_engines.py fetch` (timeout 900000). Expected: two `ENGINE` lines. The gz checksums equal those in the `.sha256` files: query `d75ffb69aa6c8ff8be33ba196a696dde5a34f669ed845124853102e41cbea188`, schema `17f75cc86b8d12f8be0f2c3d93d29cb6794bba3a78cbab91ec744e28c71fb767` as measured 2026-11-12. Run it a second time: same output, no download (the script prints `cached`).
+- [ ] **Step 2: probe files.**
+
+  `e2e/probe/schema.prisma`:
+  ```prisma
+  generator client {
+    provider = "prisma-client-js"
+  }
+  datasource db {
+    provider = "postgresql"
+    url      = "postgresql://probe@127.0.0.1:5432/probe"
+  }
+  model Probe {
+    id Int @id
+  }
+  ```
+  `e2e/probe/Containerfile.prisma`:
+  ```dockerfile
+  FROM docker.io/library/node:24.22.2-bookworm
+  WORKDIR /p
+  RUN test -r "$PRISMA_QUERY_ENGINE_LIBRARY" && test -x "$PRISMA_SCHEMA_ENGINE_BINARY" && echo "OTA-PROBE env+volume visible"
+  COPY --link schema.prisma ./
+  RUN npm init -y >/dev/null && npm install --no-audit --no-fund prisma@6.2.1 @prisma/client@6.2.1 && npx prisma generate --schema schema.prisma
+  ```
+- [ ] **Step 3: measure (env mode)** — one call: `podman build --no-cache` with the `--volume=…` and `--env=…` values printed in `PODMAN_ARGS` (without the `--podman-arg=` prefix) and `-f e2e/probe/Containerfile.prisma e2e/probe`. Example with the default cache: `podman build --no-cache --volume=/mnt/HC_Volume_106183673/projekte/open-table-agent/.work/prisma-engines/engines:/ota-prisma:ro --env=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/libquery_engine-debian-openssl-3.0.x.so.node --env=PRISMA_SCHEMA_ENGINE_BINARY=/ota-prisma/schema-engine-debian-openssl-3.0.x -f e2e/probe/Containerfile.prisma e2e/probe` (timeout 900000). Expected output contains:
+  - `OTA-PROBE env+volume visible` (podman 4.3.1 passes `--env`/`--volume` to `RUN`);
+  - `Generated Prisma Client (v6.2.1)` (generate honours the env vars);
+  - no line mentioning `binaries.prisma.sh`;
+  - exit 0. The `COPY --link` step passing also measures buildah 1.28 support.
+
+  Record the observed lines in the commit message.
+- [ ] **Step 4: decide the injection mode from Step 3.** The chosen mode goes into the D2 build command and into `e2e/prisma_engines.py` as the default.
+  - **Exit 0 with all expected lines:** mode = `env`.
+  - **The `OTA-PROBE` line is missing** (env/volume not passed to `RUN`), or **generate tries to download**: retry with fallback (a). Replace the probe's env with `--network=host --env=PRISMA_ENGINES_MIRROR=http://127.0.0.1:8765` while `prisma_engines.py serve` runs. In a single call, use a small `prisma_engines.py probe-mirror` subcommand that starts the server thread and runs the podman build. Expected: `Generated Prisma Client (v6.2.1)`, exit 0. Then mode = `mirror`.
+  - **Both fail:** fallback (b). Submit `image-holen ghcr.io/teableio/teable:latest --key ota-teable-upstream`. Note that the image holds the closed full build, and only its Prisma engine files are used. Wait for the tap, `podman load`, then `podman create` and `podman cp` the two engine files out of `node_modules/.pnpm/@prisma+engines@*/node_modules/@prisma/engines/` (ANNAHME: path inside the image — check with `podman run --rm <img> find / -name "libquery_engine-debian-openssl-3.0.x.so.node"`). Place them into `<cache>/engines/` and re-run Step 3 in mode `env`.
+  - **`COPY --link` itself fails:** end the run with `FRAGE: buildah 1.28 cannot build COPY --link (upstream Dockerfile); allowed to build with a newer podman/buildah?` Do not edit the upstream Dockerfile.
+- [ ] **Step 5: commit** `test(e2e): fetch Prisma engines via broker and measure build injection`.
+
+### Task D2: Real sync + patched image build (E4)
+
+**Preconditions:** D0 (5 images loaded) and D1 (injection mode decided).
+
+**Files:** Create `e2e/tests/__init__.py`, `e2e/tests/test_sync_real.py`; commit `upstream.lock.json`.
 
 - [ ] **Step 1: test** `e2e/tests/test_sync_real.py`
 ```python
@@ -1699,10 +1780,15 @@ class RealSync(unittest.TestCase):
             self.assertRegex(r.stdout, r"CONFLICT patch=0001-sql-query-route\.patch path=apps/nestjs-backend/src/features/base/base\.module\.ts")
 ```
 - [ ] **Step 2: run** — `make e2e-sync` → `Ran 2 tests … OK` (needs github.com; first fetch can take minutes; Bash timeout 900000).
-- [ ] **Step 3: build probe** — `python3 scripts/sync-upstream.py --build` (Bash timeout 900000; if it runs longer, rerun it — it is idempotent and only rebuilds). Expected: `UPSTREAM <sha>`, `PATCHED <sha>`, `IMAGE localhost/ota-teable:<sha12>-<8>`, exit 0, and `podman images` shows the tag. On failure, record the failing stage and the unreachable host or unsupported instruction. Expected suspects: `prisma generate` → FRAGE-2; `COPY --link` unsupported by buildah 1.28. Do not edit the upstream Dockerfile to work around it, because that would be a second patch. End the run with a `FRAGE:` line naming the failure.
+- [ ] **Step 3: build** — mode `env`: `python3 scripts/sync-upstream.py --build` followed by the three `--podman-arg=…` values from D1's `PODMAN_ARGS` line. Mode `mirror`: `python3 e2e/prisma_engines.py build-with-mirror`. Bash timeout 900000; if the build runs longer, rerun the same command — it is idempotent and only rebuilds. Expected:
+  - `UPSTREAM <sha>`, `PATCHED <sha>`, `IMAGE localhost/ota-teable:<sha12>-<8>`, exit 0;
+  - `podman images` shows the tag;
+  - the build log has no `binaries.prisma.sh` line.
+
+  On failure, record the failing stage and the unreachable host or unsupported instruction. Do not edit the upstream Dockerfile to work around it, because that would be a second patch. End the run with a `FRAGE:` line naming the failure.
 - [ ] **Step 4: commit** `upstream.lock.json` (now `image.built: true`) and the files above: `test(e2e): real upstream sync and patched image build`.
 
-### Task D2: Stack lifecycle and bootstrap
+### Task D3: Stack lifecycle and bootstrap
 
 **Files:** Create `e2e/stack.py`, `e2e/bootstrap.py`, `e2e/.gitignore` (`node_modules/`, `.env.e2e`).
 
@@ -1726,7 +1812,7 @@ class RealSync(unittest.TestCase):
 - [ ] **Step 2:** write `bootstrap.py`; with the stack up: `python3 e2e/bootstrap.py` → 5 `KEY=VALUE` lines, `TOKEN_A` non-empty.
 - [ ] **Step 3: commit** `test(e2e): podman stack and REST bootstrap for a real CE instance`.
 
-### Task D3: Acceptance tests (E1–E3)
+### Task D4: Acceptance tests (E1–E3)
 
 **Files:** Create `e2e/package.json` (deps: `@modelcontextprotocol/sdk` ^1.32.2, `vitest` ^5.1.0, `typescript`), `e2e/package-lock.json`, `e2e/tsconfig.json`, `e2e/vitest.config.ts`, `e2e/tests/acceptance.e2e.test.ts`.
 
@@ -1795,7 +1881,7 @@ describe("real CE", () => {
 Spec §4.6 item 4 ANNAHME (the `dbTableName` form): the test handles both forms. Afterwards, fix the `sql-query` tool description to the form actually observed. That is a one-line change in `server/src/tools/sql-query.ts`, made in D's branch in agreement with chain A's owner (or as a follow-up card if A is closed).
 - [ ] **Step 2: run** — `make e2e` (Bash timeout 900000). Expected: vitest `4 passed`, then `make e2e: OK (e2e-run)`, and the pod is removed (`podman pod ls` empty).
 - [ ] **Step 3: mutations**
-  - E3: on a scratch branch, rebuild the image from a series without the controller hunk: delete `patches/0001-*.patch`, then `python3 scripts/sync-upstream.py --build` with a temporary patches dir containing only the module/ledger hunks. "sql-query returns rows" then fails with 404.
+  - E3: on a scratch branch, rebuild the image from a series without the controller hunk: delete `patches/0001-*.patch`, then `python3 scripts/sync-upstream.py --build` (plus D1's injection args) with a temporary patches dir containing only the module/ledger hunks. "sql-query returns rows" then fails with 404.
   - E1: build the server with `get-doc` removed from `TOOLS` → "lists 12 tools" FAIL.
   - E2: apply the S3 mutation → "create then read back by field name filter" FAIL (wrong rows).
   - Revert each mutation and record the observed failures in the commit message.
@@ -1807,29 +1893,32 @@ Spec §4.6 item 4 ANNAHME (the `dbTableName` form): the test handles both forms.
 
 ```
 this run ──► A (L) ─┐
-         ──► B (S) ─┼─► merge into main ──► D1 (needs admin 1–3) ──► D2 ──► D3
+         ──► B (S) ─┼─► merge into main ──► D0 (blocks on t_296d1445, 5 taps) ──► D1 ──► D2 ──► D3 ──► D4
          ──► C (M) ─┘
 ```
 - A, B and C run in parallel and share no files. A is the longest (11 tasks) and gates D. B is small, but its `test_applies_to_base` depends on the local teable-fork object store.
 - Relative sizes: A ≈ 50 %, C ≈ 20 %, D ≈ 20 %, B ≈ 10 % of the total effort. D's wall-clock is dominated by the first image build (monorepo `pnpm -r run build`; ANNAHME: 20–60 min on 16 cores).
 - External gates on D, none of them agent work:
-  1. Birk reviews, merges and installs the `image-holen` admin job (chain t_ba874608).
-  2. Birk approves 5 image fetches (taps).
-  3. FRAGE-2 is decided (prisma engine host).
+  1. Birk reviews, merges (card t_296d1445) and admin-installs the `image-holen` job (chain t_ba874608).
+  2. Birk approves the 5 image fetches (taps).
 
-  D1 cannot start before these. An agent can prepare D's code (D2/D3 files) earlier, but cannot run it.
-- D3's sql-query description fix may touch `server/` (A-owned). If chain A is still open, it goes there; otherwise it becomes a one-line follow-up card.
+  Until both are done, D0 sets `kanban_block(kind="dependency")` on t_296d1445; it does not fail.
+- Not gates: the Prisma engines (D-2) come through `hermes-download` with no admin step. D1's measurement only picks the injection mode (env / mirror / image extraction). Image extraction (fallback b) would add a 6th tap.
+- An agent can write D's code (D1–D4 files) before the gates lift, but cannot run D0–D4 end to end.
+- D4's sql-query description fix may touch `server/` (A-owned). If chain A is still open, it goes there; otherwise it becomes a one-line follow-up card.
 
 ## Preconditions / admin steps for Birk
 
-1. Review, merge and install the `image-holen` admin job (chain t_ba874608), so `/var/lib/admin-jobs-images/` exists.
-2. Approve 5 image fetches, each submitted by an agent with `~/.hermes/profiles/birk/scripts/admin-job-submit.py image-holen <ref> --key <key>` (FRAGE-3: exact syntax after install):
+Decided 2026-11-12 (spec §12, D-1..D-3); nothing left to answer.
+
+1. Review and merge the image-holen merge card **t_296d1445** (chain t_ba874608), then admin-install the job, so `/var/lib/admin-jobs-images/` exists. Chain D's first step blocks on this card (`kanban_block(kind="dependency")`) until then.
+2. Approve 5 image fetches on the phone. Chain D submits each with `~/.hermes/profiles/birk/scripts/admin-job-submit.py image-holen <ref> --key <unique-key>`:
    - `docker.io/library/node:24.22.2-bookworm`
    - `docker.io/library/node:24.22.2-bookworm-slim`
    - `docker.io/tianon/gosu:1.19`
    - `docker.io/library/postgres:15.4`
    - `docker.io/library/redis:7.2.4`
 
-   After each tap, `podman load -i /var/lib/admin-jobs-images/<file>`.
-3. Decide FRAGE-2: allow egress to `binaries.prisma.sh` for uid birk, or approve the engine-injection route.
-4. Optionally answer FRAGE-1 (`base|query_data` vs `base|read`); the default is `base|query_data`.
+   Results land in `/var/spool/admin-jobs/done/<key>.json(l)`; the agent then runs `podman load -i /var/lib/admin-jobs-images/<tarball>`.
+3. Only if D1's fallback (b) is needed: one more tap for an upstream Teable image (`ghcr.io/teableio/teable:latest`), used only to extract the Prisma engine files.
+4. No egress change. `binaries.prisma.sh` stays blocked; the engines come through `hermes-download` (D-2).

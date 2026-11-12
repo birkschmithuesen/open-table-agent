@@ -1,0 +1,3 @@
+# Local scratch (research clones, probes) and sync/build work dirs (worktrees, Prisma engine cache).
+.scratch/
+.work/
