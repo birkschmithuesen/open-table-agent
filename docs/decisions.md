@@ -17,3 +17,10 @@
 7. **Not building on `ltphat2204/teable-mcp-server`** (small, unmaintained). Our own remote-mode code from
    that work may be ported (MIT, keep notice).
 8. Working name `open-table-agent`; no "Teable" in the product name (brand clause in Teable's LICENSE §7(e)).
+9. **Goes public** once the first version is merged and checked (Birk 2026-11-12): MCP server under MIT,
+   the Teable patch under AGPL-3.0 (it modifies Teable). Gate before flipping visibility: copy check against
+   the recovered closed reference (no verbatim/near-verbatim code), licence files present, no secrets,
+   no instance or personal data in history.
+10. **festival-desk consumes this repo as a pinned dependency**, never as copied code: `deploy/teable/` builds
+    the patched Teable via `scripts/sync-upstream`, the MCP server runs as its own service (or is started by
+    Hermes), version pinned to a tag of this repo.
