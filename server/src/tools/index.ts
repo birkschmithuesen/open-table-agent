@@ -12,5 +12,5 @@ import { tool as createRecords } from "./create-records.js";
 import { tool as updateRecords } from "./update-records.js";
 import { tool as deleteRecords } from "./delete-records.js";
 
-export const TOOLS: ToolDef[] = [listBases, getTablesMeta, getFields, getRecords, sqlQuery, getDoc, searchApi, callApiRead, callApiWrite,
-  createRecords, updateRecords, deleteRecords];
+export const TOOLS: ToolDef[] = [listBases, getTablesMeta, getFields, getRecords, sqlQuery, getDoc, searchApi, callApiRead,
+  createRecords, updateRecords, deleteRecords, callApiWrite];
