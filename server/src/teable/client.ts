@@ -9,6 +9,17 @@ export class TeableClient {
               private readonly opts: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}) {
     this.apiBase = `${teableUrl.replace(/\/+$/, "")}/api`;
   }
+  /** GET an absolute URL (outside /api, e.g. the OpenAPI document) with the bearer token. */
+  async fetchAbsolute(url: string): Promise<unknown> {
+    const res = await (this.opts.fetchImpl ?? fetch)(url, {
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(this.opts.timeoutMs ?? 120_000),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new TeableApiError(res.status, `Failed to fetch ${url}: HTTP ${res.status}`, text);
+    try { return JSON.parse(text); }
+    catch { throw new Error(`Failed to fetch ${url}: response is not JSON`); }
+  }
   async request<T = unknown>(method: string, path: string,
       o: { query?: Record<string, QueryValue>; body?: unknown } = {}): Promise<{ status: number; data: T }> {
     if (!path.startsWith("/")) throw new Error(`path must start with /: ${path}`);
