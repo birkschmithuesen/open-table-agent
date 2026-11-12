@@ -24,7 +24,7 @@ export function notWrittenWarnings(sent: Record<string, unknown>[],
   sent.forEach((s, i) => {
     const got = returned[i]?.fields ?? {};
     const missing = Object.entries(s)
-      .filter(([id, v]) => v !== null && v !== undefined && (got[id] === undefined || got[id] === null))
+      .filter(([id, v]) => v !== null && v !== undefined && v !== false &&(got[id] === undefined || got[id] === null))
       .map(([id]) => names.get(id) ?? id);
     if (missing.length) warnings.push(`Row ${i}: not written: ${missing.join(", ")}`);
   });

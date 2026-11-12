@@ -31,6 +31,17 @@ it("mode B: '' leaves unchanged, null clears", async () => {
   await c.callTool({ name: "update-records", arguments: { tableId: "tbl1", header: ["recordId", "Name", "Count"], records: [["rec1", "", null]] } });
   expect(stub.calls.at(-1)!.body).toEqual({ fieldKeyType: "id", typecast: true, records: [{ id: "rec1", fields: { fldCount001: null } }] });
 });
+const boxFields = [...fields, { id: "fldBox00001", name: "Done", type: "checkbox" }];
+it("mode B: unchecking a box (false echoed as null) yields no warning; a dropped value still does", async () => {
+  stub = await startStubTeable({ "GET /api/table/tbl1/field": () => ({ body: boxFields }),
+    "PATCH /api/table/tbl1/record": (c) => ({ body: (c.body as any).records.map((r: any) => ({ id: r.id,
+      fields: { ...r.fields, fldBox00001: null, fldCount001: undefined } })) }) });
+  const c = await connectClient(stub.url);
+  const ok = parseText(await c.callTool({ name: "update-records", arguments: { tableId: "tbl1", header: ["recordId", "Done"], records: [["rec1", false]] } }) as any);
+  expect((ok as any).warnings).toBeUndefined();
+  const bad = parseText(await c.callTool({ name: "update-records", arguments: { tableId: "tbl1", header: ["recordId", "Done", "Count"], records: [["rec1", false, 5]] } }) as any);
+  expect((bad as any).warnings).toEqual(["Row 0: not written: Count"]);
+});
 it("mode B: recordId header is matched exactly (case-sensitive)", async () => {
   stub = await startStubTeable({ "GET /api/table/tbl1/field": () => ({ body: fields }),
     "PATCH /api/table/tbl1/record": (c) => ({ body: (c.body as any).records }) });
