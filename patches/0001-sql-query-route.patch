@@ -1,0 +1,108 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: "Robo (coder)" <robo@artesmobiles.art>
+Date: Thu, 12 Nov 2026 18:29:22 +0100
+Subject: [PATCH] feat(base): expose read-only SQL query route for the
+ community build
+
+---
+ .../base-sql-executor.module.ts               |  2 +
+ .../base-sql-query.controller.ts              | 41 +++++++++++++++++++
+ .../src/features/base/base.module.ts          |  2 +
+ .../test/admin/table-route-ledger.ts          |  1 -
+ 4 files changed, 45 insertions(+), 1 deletion(-)
+ create mode 100644 apps/nestjs-backend/src/features/base-sql-executor/base-sql-query.controller.ts
+
+diff --git a/apps/nestjs-backend/src/features/base-sql-executor/base-sql-executor.module.ts b/apps/nestjs-backend/src/features/base-sql-executor/base-sql-executor.module.ts
+index 2a505b37f..e78abe70e 100644
+--- a/apps/nestjs-backend/src/features/base-sql-executor/base-sql-executor.module.ts
++++ b/apps/nestjs-backend/src/features/base-sql-executor/base-sql-executor.module.ts
+@@ -1,8 +1,10 @@
+ import { Module } from '@nestjs/common';
+ import { TableQueryObservationRuntimeModule } from '../v2/table-query-observation-runtime.module';
+ import { BaseSqlExecutorService } from './base-sql-executor.service';
++import { BaseSqlQueryController } from './base-sql-query.controller';
+ @Module({
+   imports: [TableQueryObservationRuntimeModule],
++  controllers: [BaseSqlQueryController],
+   providers: [BaseSqlExecutorService],
+   exports: [BaseSqlExecutorService],
+ })
+diff --git a/apps/nestjs-backend/src/features/base-sql-executor/base-sql-query.controller.ts b/apps/nestjs-backend/src/features/base-sql-executor/base-sql-query.controller.ts
+new file mode 100644
+index 000000000..d1ff2e96e
+--- /dev/null
++++ b/apps/nestjs-backend/src/features/base-sql-executor/base-sql-query.controller.ts
+@@ -0,0 +1,41 @@
++import { Body, Controller, Param, Post } from '@nestjs/common';
++import { z } from 'zod';
++import { ZodValidationPipe } from '../../zod.validation.pipe';
++import { Permissions } from '../auth/decorators/permissions.decorator';
++import { BaseSqlExecutorService } from './base-sql-executor.service';
++
++const baseSqlQueryRoSchema = z.object({
++  sql: z.string().min(1),
++  parameters: z.array(z.unknown()).optional(),
++});
++type IBaseSqlQueryRo = z.infer<typeof baseSqlQueryRoSchema>;
++
++const toJsonSafe = (value: unknown): unknown => {
++  if (typeof value === 'bigint') {
++    return Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
++  }
++  if (Array.isArray(value)) return value.map(toJsonSafe);
++  if (value && typeof value === 'object') {
++    if (typeof (value as { toJSON?: unknown }).toJSON === 'function') return value;
++    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toJsonSafe(v)]));
++  }
++  return value;
++};
++
++@Controller('api/base/')
++export class BaseSqlQueryController {
++  constructor(private readonly baseSqlExecutorService: BaseSqlExecutorService) {}
++
++  @Post(':baseId/sql-query')
++  @Permissions('base|query_data')
++  async sqlQuery(
++    @Param('baseId') baseId: string,
++    @Body(new ZodValidationPipe(baseSqlQueryRoSchema)) ro: IBaseSqlQueryRo
++  ): Promise<{ rows: unknown[] }> {
++    const rows = await this.baseSqlExecutorService.executeQuerySql<unknown[]>(baseId, ro.sql, {
++      parameters: ro.parameters,
++      structuredCoverage: true,
++    });
++    return { rows: toJsonSafe(rows) as unknown[] };
++  }
++}
+diff --git a/apps/nestjs-backend/src/features/base/base.module.ts b/apps/nestjs-backend/src/features/base/base.module.ts
+index 3b1c39c4a..3921670dc 100644
+--- a/apps/nestjs-backend/src/features/base/base.module.ts
++++ b/apps/nestjs-backend/src/features/base/base.module.ts
+@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
+ import { DbProvider } from '../../db-provider/db.provider';
+ import { AttachmentsStorageModule } from '../attachments/attachments-storage.module';
+ import { StorageModule } from '../attachments/plugins/storage.module';
++import { BaseSqlExecutorModule } from '../base-sql-executor/base-sql-executor.module';
+ import { CanaryModule } from '../canary';
+ import { CollaboratorModule } from '../collaborator/collaborator.module';
+ import { FieldDuplicateModule } from '../field/field-duplicate/field-duplicate.module';
+@@ -59,6 +60,7 @@ import { BaseService } from './base.service';
+     V2Module,
+     SpaceDataDbCopyModule,
+     SpaceDataDbMigrationGuardModule,
++    BaseSqlExecutorModule,
+   ],
+   providers: [
+     DbProvider,
+diff --git a/apps/nestjs-backend/test/admin/table-route-ledger.ts b/apps/nestjs-backend/test/admin/table-route-ledger.ts
+index 5fcd031c5..a503defb1 100644
+--- a/apps/nestjs-backend/test/admin/table-route-ledger.ts
++++ b/apps/nestjs-backend/test/admin/table-route-ledger.ts
+@@ -69,7 +69,6 @@ export const TABLE_ROUTE_EDITIONS: Record<string, 'EE'> = {
+   'POST /api/table/:tableId/record/archive-stream': 'EE',
+   'POST /api/table/:tableId/archive/restore': 'EE',
+   'POST /api/base/:baseId/sign-attachment-urls': 'EE',
+-  'POST /api/base/:baseId/sql-query': 'EE',
+   'POST /api/template/install': 'EE',
+   'GET /api/base/:baseId/template/installs': 'EE',
+   'GET /api/base/:baseId/template/installs/:installId': 'EE',

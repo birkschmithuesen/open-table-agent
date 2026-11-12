@@ -20,7 +20,7 @@ access that Teable deliberately withholds from them.
   order with `git am --3way`.
 - `tests/test_patch_series.py`: static checks (no checkout, no network) — the series applies to
   `BASE`, touches only the allow-listed paths, keeps the `base|query_data` permission, and this
-  README keeps the AGPL-3.0 sentence above.
+  README keeps its licence statement above.
 
 ## Regenerating the series
 
