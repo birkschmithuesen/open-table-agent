@@ -6,7 +6,11 @@
 # (buildah 1.28 lacks it; see e2e/build_shim.py). The upstream Dockerfile is never touched.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "${1:-}" = "build" ]; then
-  mapfile -d '' args < <(python3 "$here/../build_shim.py" rewrite-args "$@") || exit 1
+  rendered="$(mktemp)" || exit 1
+  python3 "$here/../build_shim.py" rewrite-args "$@" > "$rendered" || { rm -f "$rendered"; exit 1; }
+  mapfile -d '' args < "$rendered"
+  rm -f "$rendered"
+  [ "${#args[@]}" -gt 0 ] || exit 1
   set -- "${args[@]}"
 fi
 exec systemd-run --user --wait --collect --quiet --pipe -p NoNewPrivileges=no \
