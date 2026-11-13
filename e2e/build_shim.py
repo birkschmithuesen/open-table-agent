@@ -3,6 +3,7 @@
 
 render(src, dst): copy a Dockerfile, dropping the `--link` flag from COPY/ADD lines (idempotent).
 `--link` only changes layer caching, not the resulting image. The source file is never modified.
+Also rewrites a bare `RUN pnpm fetch` to first seed the pnpm store with the mounted xlsx tarball.
 
 CLI (used by e2e/bin/podman):
   build_shim.py rewrite-args <podman args...>
@@ -23,7 +24,26 @@ _INSTR = re.compile(r"^(\s*(?:COPY|ADD)\s+)((?:--\S+\s+)*)", re.IGNORECASE)
 _LINK = re.compile(r"--link(?:=\S+)?$")
 
 
+XLSX_MOUNT = "/ota-vendor/xlsx-0.20.3.tgz"  # exposed by e2e/vendor_xlsx.py (PODMAN_ARGS --volume)
+XLSX_URL = "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+XLSX_INTEGRITY = "sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA=="
+_FETCH = re.compile(r"^(\s*RUN\s+)pnpm fetch(\s*)$", re.IGNORECASE)
+# `pnpm store add <file>` indexes the tarball as `<integrity>\tfile:...`; pnpm fetch looks up
+# `<integrity>\t<tarball url>`, so re-key the entry (measured with pnpm 12.11.2, store v11).
+_RELINK = (
+    "node -e \"const D=require('node:sqlite').DatabaseSync,"
+    "p=require('child_process').execSync('pnpm store path').toString().trim()+'/index.db',"
+    f"i='{XLSX_INTEGRITY}',"
+    "d=new D(p);"
+    "d.prepare('insert or replace into package_index select ?, data from package_index where key like ?')"
+    f".run(i+'\\t{XLSX_URL}',i+'%file:%')\""
+)
+
+
 def _fix_line(line: str) -> str:
+    f = _FETCH.match(line)
+    if f:  # seed the pnpm store so `pnpm fetch` finds xlsx (cdn.sheetjs.com is unreachable)
+        return f"{f.group(1)}pnpm store add {XLSX_MOUNT} && {_RELINK} && pnpm fetch{f.group(2)}"
     m = _INSTR.match(line)
     if not m or "--link" not in m.group(2):
         return line
