@@ -14,7 +14,7 @@
   "patched_commit": "247f641806dfe8aed9b80347b329cbfc419f90f8",
   "image": {
     "tag": "localhost/ota-teable:b8425f5a60d0-f98cea1e",
-    "built": false
+    "built": true
   },
   "generated_at": "2026-11-13T17:35:52Z"
 }

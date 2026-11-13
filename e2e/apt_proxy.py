@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Broker-backed local APT proxy for the patched-Teable image build (no direct egress to Debian hosts).
 
-The build container (--network=host, http_proxy=http://127.0.0.1:<port>) sends plain-http apt requests
+The build (--network=host, --build-arg http_proxy=http://127.0.0.1:<port>, which reaches every stage's RUN) sends plain-http apt requests
 for deb.debian.org / security.debian.org (upstream's Debian sources are http://). Every request is
 served from a cache under .work/apt-cache/ that is filled only through `hermes-download`:
   * InRelease / Release / Release.gpg  --unverified (apt verifies the GPG signature itself)
@@ -290,7 +290,9 @@ def _podman_args(script: str) -> list[str]:
 
 def cmd_build(cache: Path, port: int, extra: list[str]) -> int:
     pargs = _podman_args("prisma_engines.py") + _podman_args("vendor_xlsx.py")
-    pargs += ["--podman-arg=--network=host", f"--podman-arg=--env=http_proxy=http://127.0.0.1:{port}"]
+    # --build-arg (predefined proxy arg) reaches RUN in EVERY stage; --env would only hit the final one,
+    # and with --network=host the other stages would silently go direct to deb.debian.org.
+    pargs += ["--podman-arg=--network=host", f"--podman-arg=--build-arg=http_proxy=http://127.0.0.1:{port}"]
     if not any(a.startswith("--work-dir") for a in extra):
         extra = ["--work-dir", str(ROOT / ".work"), *extra]
     cmd = [sys.executable, str(ROOT / "scripts" / "sync-upstream.py"), "--build", *pargs, *extra]
