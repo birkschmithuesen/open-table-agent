@@ -13,7 +13,7 @@ other hosts) is refused. Release files are refreshed once per proxy run; everyth
 Usage:
   apt_proxy.py serve [--cache DIR] [--port N]
   apt_proxy.py build [--cache DIR] [--port N] [-- <sync-upstream.py args>]
-    Fetches Prisma engines + xlsx via the broker, runs the proxy in-process (thread) and
+    Fetches Prisma engines + xlsx + node headers via the broker, runs the proxy in-process (thread) and
     `scripts/sync-upstream.py --build` with e2e/bin/podman against it. This is the D2 build command.
 """
 from __future__ import annotations
@@ -276,9 +276,9 @@ def start_server(cache: Path, port: int, fetch=broker_fetch) -> http.server.Thre
 
 
 def _podman_args(script: str) -> list[str]:
-    r = subprocess.run([sys.executable, str(ROOT / "e2e" / script), "fetch" if script == "prisma_engines.py" else "--dir",
-                        *([] if script == "prisma_engines.py" else [str(ROOT / ".work" / "sheetjs")])],
-                       capture_output=True, text=True)
+    sub = {"prisma_engines.py": ["fetch"], "vendor_xlsx.py": ["--dir", str(ROOT / ".work" / "sheetjs")],
+           "node_headers.py": []}[script]
+    r = subprocess.run([sys.executable, str(ROOT / "e2e" / script), *sub], capture_output=True, text=True)
     sys.stderr.write(r.stderr)
     if r.returncode != 0:
         raise SystemExit(f"{script} failed ({r.returncode})")
@@ -289,7 +289,8 @@ def _podman_args(script: str) -> list[str]:
 
 
 def cmd_build(cache: Path, port: int, extra: list[str]) -> int:
-    pargs = _podman_args("prisma_engines.py") + _podman_args("vendor_xlsx.py")
+    pargs = (_podman_args("prisma_engines.py") + _podman_args("vendor_xlsx.py")
+             + _podman_args("node_headers.py"))
     # --build-arg (predefined proxy arg) reaches RUN in EVERY stage; --env would only hit the final one,
     # and with --network=host the other stages would silently go direct to deb.debian.org.
     pargs += ["--podman-arg=--network=host", f"--podman-arg=--build-arg=http_proxy=http://127.0.0.1:{port}"]
