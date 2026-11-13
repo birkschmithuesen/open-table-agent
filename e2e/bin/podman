@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# podman shim: this shell has NoNewPrivs=1, so plain podman fails. Run it via a transient systemd user
+# unit with NoNewPrivileges=no. Storage driver stays vfs (storage-vfs.conf). Use it via
+#   OTA_PODMAN=<repo>/e2e/bin/podman  (scripts/sync-upstream.py)  or  PATH=<repo>/e2e/bin:$PATH.
+exec systemd-run --user --wait --collect --quiet --pipe -p NoNewPrivileges=no \
+  --working-directory="$PWD" \
+  -E CONTAINERS_STORAGE_CONF="${OTA_PODMAN_STORAGE_CONF:-$HOME/.hermes/profiles/birk/cache/scratch/podman/storage-vfs.conf}" \
+  podman "$@"

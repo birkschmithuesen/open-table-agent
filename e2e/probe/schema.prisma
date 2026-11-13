@@ -1,0 +1,10 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://probe@127.0.0.1:5432/probe"
+}
+model Probe {
+  id Int @id
+}
