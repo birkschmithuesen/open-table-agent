@@ -26,7 +26,7 @@ HASH = "4123509d24aa4dede1e864b46351bf2790323b69"
 PLATFORM = "debian-openssl-3.0.x"
 BASE = f"https://binaries.prisma.sh/all_commits/{HASH}/{PLATFORM}"
 DEFAULT_CACHE = ROOT / ".work" / "prisma-engines"
-DEFAULT_MODE = "env"
+DEFAULT_MODE = "env"  # measured 2026-11-13 (probe through e2e/bin/podman build shim): env mode works
 # (kind, gz file, engine file name)
 FILES = [
     ("query", "libquery_engine.so.node.gz", f"libquery_engine-{PLATFORM}.so.node"),
