@@ -62,6 +62,14 @@ def parse_sha_file(p: Path) -> str:
     return m.group(1).lower()
 
 
+def write_unzipped_sha(d: Path, gz_name: str, eng: Path) -> Path:
+    """Prisma's downloader also checks `<file>.sha256` of the UNZIPPED engine; derive it from the engine we
+    decompressed out of the broker-verified gz (published only has the gz sha)."""
+    out = d / (gz_name[:-3] + ".sha256")
+    out.write_text(f"{sha256_file(eng)}  {gz_name[:-3]}\n")
+    return out
+
+
 def podman_args(cache: Path, port: int = MIRROR_PORT) -> list[str]:
     """Mirror mode: prisma's own postinstall/generate download the engines from our broker-verified mirror
     (served by start_server) into node_modules, exactly as upstream, so the image needs no PRISMA_* env
@@ -88,6 +96,7 @@ def cmd_fetch(cache: Path) -> int:
         with gzip.open(gz, "rb") as src, eng.open("wb") as dst:
             shutil.copyfileobj(src, dst)
         eng.chmod(0o755)
+        write_unzipped_sha(d, gz_name, eng)
         print(f"ENGINE {kind} {eng} gz_sha256={hexv}")
     print("PODMAN_ARGS " + " ".join("--podman-arg=" + a for a in podman_args(cache)))
     return 0

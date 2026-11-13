@@ -110,6 +110,14 @@ class BuildShimTest(unittest.TestCase):
         self.assertEqual(prisma_engines.podman_args(self.tmp, 9000),
                          ["--build-arg=PRISMA_ENGINES_MIRROR=http://127.0.0.1:9000"])
 
+    def test_unzipped_sha_written_next_to_gz(self):
+        from e2e import prisma_engines
+        eng = self.tmp / "eng"
+        eng.write_bytes(b"engine")
+        out = prisma_engines.write_unzipped_sha(self.tmp, "schema-engine.gz", eng)
+        self.assertEqual(out.name, "schema-engine.sha256")
+        self.assertEqual(out.read_text().split()[0], hashlib.sha256(b"engine").hexdigest())
+
     def test_rewrite_args_substitutes_file(self):
         (self.tmp / "ctx").mkdir()
         (self.tmp / "ctx" / "Dockerfile").write_text(FIXTURE)
