@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Broker-backed local APT proxy for the patched-Teable image build (no direct egress to Debian hosts).
 
-The build (--network=host, --build-arg http_proxy=http://127.0.0.1:<port>, which reaches every stage's RUN) sends plain-http apt requests
+The build (--network=host, --build-arg APT_CONFIG=<conf with Acquire::http::Proxy>, which reaches every stage's RUN) sends plain-http apt requests
 for deb.debian.org / security.debian.org (upstream's Debian sources are http://). Every request is
 served from a cache under .work/apt-cache/ that is filled only through `hermes-download`:
   * InRelease / Release / Release.gpg  --unverified (apt verifies the GPG signature itself)
@@ -288,22 +288,35 @@ def _podman_args(script: str) -> list[str]:
     raise SystemExit(f"{script}: no PODMAN_ARGS line")
 
 
+def apt_conf_args(conf_dir: Path, port: int) -> list[str]:
+    """Point only apt at the proxy (APT_CONFIG build-arg + read-only volume); no http_proxy, so npm/pnpm/node
+    downloads behave exactly as upstream."""
+    conf_dir = Path(conf_dir).resolve()
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    (conf_dir / "apt.conf").write_text(f'Acquire::http::Proxy "http://127.0.0.1:{port}";\n')
+    return [f"--podman-arg=--volume={conf_dir}:/ota-apt:ro", "--podman-arg=--build-arg=APT_CONFIG=/ota-apt/apt.conf"]
+
+
 def cmd_build(cache: Path, port: int, extra: list[str]) -> int:
     pargs = (_podman_args("prisma_engines.py") + _podman_args("vendor_xlsx.py")
              + _podman_args("node_headers.py"))
-    # --build-arg (predefined proxy arg) reaches RUN in EVERY stage; --env would only hit the final one,
-    # and with --network=host the other stages would silently go direct to deb.debian.org.
-    pargs += ["--podman-arg=--network=host", f"--podman-arg=--build-arg=http_proxy=http://127.0.0.1:{port}"]
+    # APT_CONFIG (build-arg, declared per stage by the shim) reaches apt in EVERY stage; --env would only hit
+    # the final one, and http_proxy would also divert npm/node HTTPS downloads (CONNECT refused).
+    pargs += ["--podman-arg=--network=host"] + apt_conf_args(ROOT / ".work" / "apt-conf", port)
     if not any(a.startswith("--work-dir") for a in extra):
         extra = ["--work-dir", str(ROOT / ".work"), *extra]
     cmd = [sys.executable, str(ROOT / "scripts" / "sync-upstream.py"), "--build", *pargs, *extra]
     env = dict(os.environ, OTA_PODMAN=os.environ.get("OTA_PODMAN") or str(ROOT / "e2e" / "bin" / "podman"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import prisma_engines  # engines mirror (broker-verified cache) for prisma's own download
     srv = start_server(cache, port)
+    pmirror = prisma_engines.start_server(prisma_engines.DEFAULT_CACHE, prisma_engines.MIRROR_PORT)
     try:
         return subprocess.run(cmd, env=env).returncode
     finally:
-        srv.shutdown()
-        srv.server_close()
+        for x in (srv, pmirror):
+            x.shutdown()
+            x.server_close()
 
 
 def main(argv: list[str]) -> int:

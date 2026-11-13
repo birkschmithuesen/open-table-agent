@@ -3,7 +3,7 @@
 
 render(src, dst): copy a Dockerfile, dropping the `--link` flag from COPY/ADD lines (idempotent).
 `--link` only changes layer caching, not the resulting image. The source file is never modified.
-Declares the build-only ARGs (Prisma engine paths, node-gyp nodedir) after every FROM.
+Declares the build-only ARGs (Prisma engines mirror, node-gyp nodedir, apt config) after every FROM.
 Also rewrites a bare `RUN pnpm fetch` to first seed the pnpm store with the mounted xlsx tarball.
 
 CLI (used by e2e/bin/podman):
@@ -43,7 +43,7 @@ _RELINK = (
 
 # Build-only values are passed as `--build-arg` (visible to RUN, never persisted into image ENV).
 # ARG scope is per stage, so each stage declares them right after its FROM.
-BUILD_ARGS = ("PRISMA_QUERY_ENGINE_LIBRARY", "PRISMA_SCHEMA_ENGINE_BINARY", "npm_config_nodedir")
+BUILD_ARGS = ("PRISMA_ENGINES_MIRROR", "npm_config_nodedir", "APT_CONFIG")
 _FROM = re.compile(r"^\s*FROM\s", re.IGNORECASE)
 
 

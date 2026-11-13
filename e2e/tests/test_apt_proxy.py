@@ -27,6 +27,16 @@ def release_text(entries: dict[str, bytes]) -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
+class AptConf(unittest.TestCase):
+    def test_apt_conf_args_scope_proxy_to_apt_only(self):
+        d = Path(tempfile.mkdtemp())
+        args = ap.apt_conf_args(d, 8766)
+        self.assertEqual((d / "apt.conf").read_text(), 'Acquire::http::Proxy "http://127.0.0.1:8766";\n')
+        self.assertIn(f"--podman-arg=--volume={d.resolve()}:/ota-apt:ro", args)
+        self.assertIn("--podman-arg=--build-arg=APT_CONFIG=/ota-apt/apt.conf", args)
+        self.assertFalse([a for a in args if "http_proxy" in a])
+
+
 class Pure(unittest.TestCase):
     def test_parse_release_only_sha256_block(self):
         t = release_text({"main/binary-amd64/Packages.xz": b"abc"}).decode()

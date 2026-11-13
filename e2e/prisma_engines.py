@@ -2,7 +2,7 @@
 """Prisma engines for the patched-Teable build, fetched only via the download broker (spec D-2).
 
 Subcommands:
-  fetch [--cache DIR]          idempotent; prints ENGINE lines and one PODMAN_ARGS line (mode build-arg)
+  fetch [--cache DIR]          idempotent; prints ENGINE lines and one PODMAN_ARGS line (mode mirror)
   serve [--cache DIR] --port N serve the cache in mirror layout (fallback a)
   build-with-mirror            serve + run scripts/sync-upstream.py --build against the mirror
 """
@@ -26,7 +26,7 @@ HASH = "4123509d24aa4dede1e864b46351bf2790323b69"
 PLATFORM = "debian-openssl-3.0.x"
 BASE = f"https://binaries.prisma.sh/all_commits/{HASH}/{PLATFORM}"
 DEFAULT_CACHE = ROOT / ".work" / "prisma-engines"
-DEFAULT_MODE = "build-arg"  # build-only ARGs (e2e/build_shim.py declares them per stage); never baked into image ENV
+DEFAULT_MODE = "mirror"  # PRISMA_ENGINES_MIRROR build-arg (declared per stage by e2e/build_shim.py); never image ENV
 # (kind, gz file, engine file name)
 FILES = [
     ("query", "libquery_engine.so.node.gz", f"libquery_engine-{PLATFORM}.so.node"),
@@ -62,13 +62,11 @@ def parse_sha_file(p: Path) -> str:
     return m.group(1).lower()
 
 
-def podman_args(cache: Path) -> list[str]:
-    eng = cache.resolve() / "engines"
-    return [
-        f"--volume={eng}:/ota-prisma:ro",
-        f"--build-arg=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/libquery_engine-{PLATFORM}.so.node",
-        f"--build-arg=PRISMA_SCHEMA_ENGINE_BINARY=/ota-prisma/schema-engine-{PLATFORM}",
-    ]
+def podman_args(cache: Path, port: int = MIRROR_PORT) -> list[str]:
+    """Mirror mode: prisma's own postinstall/generate download the engines from our broker-verified mirror
+    (served by start_server) into node_modules, exactly as upstream, so the image needs no PRISMA_* env
+    (PRISMA_*_ENGINE_* paths would skip the download and leave schema-engine out of the image)."""
+    return [f"--build-arg=PRISMA_ENGINES_MIRROR=http://127.0.0.1:{port}"]
 
 
 def cmd_fetch(cache: Path) -> int:
@@ -123,7 +121,7 @@ def with_mirror(cache: Path, port: int, cmd: list[str], env: dict[str, str]) -> 
 def cmd_build_with_mirror(cache: Path, port: int, extra: list[str]) -> int:
     cmd = [sys.executable, str(ROOT / "scripts/sync-upstream.py"), "--build",
            "--podman-arg=--network=host",
-           f"--podman-arg=--env=PRISMA_ENGINES_MIRROR=http://127.0.0.1:{port}", *extra]
+           *("--podman-arg=" + a for a in podman_args(cache, port)), *extra]
     env = dict(os.environ, OTA_PODMAN=podman_bin())
     return with_mirror(cache, port, cmd, env)
 

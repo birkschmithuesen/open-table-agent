@@ -88,27 +88,27 @@ class BuildShimTest(unittest.TestCase):
                 self.assertEqual(out[i + 1:i + 1 + len(build_shim.BUILD_ARGS)],
                                  [f"ARG {a}" for a in build_shim.BUILD_ARGS])
         self.assertEqual(sum(l.startswith("FROM ") for l in out), 3)
-        self.assertEqual(out.count("ARG PRISMA_QUERY_ENGINE_LIBRARY"), 3)
-        self.assertEqual(out.count("ARG PRISMA_SCHEMA_ENGINE_BINARY"), 3)
+        self.assertEqual(out.count("ARG PRISMA_ENGINES_MIRROR"), 3)
         self.assertEqual(out.count("ARG npm_config_nodedir"), 3)
+        self.assertEqual(out.count("ARG APT_CONFIG"), 3)
 
     def test_build_args_never_become_env(self):
         out = build_shim.render(self.src, self.tmp / "o").read_text()
-        self.assertNotRegex(out, r"(?m)^\s*ENV\s+.*(PRISMA_|npm_config_nodedir|http_proxy)")
+        self.assertNotRegex(out, r"(?m)^\s*ENV\s+.*(PRISMA_|npm_config_nodedir|APT_CONFIG|http_proxy)")
 
     def test_build_args_idempotent(self):
         self.src.write_text("FROM a\nRUN x\n")
         a = build_shim.render(self.src, self.tmp / "a")
         b = build_shim.render(a, self.tmp / "b")
-        self.assertEqual(b.read_text().count("ARG PRISMA_QUERY_ENGINE_LIBRARY"), 1)
+        self.assertEqual(b.read_text().count("ARG PRISMA_ENGINES_MIRROR"), 1)
 
     def test_prisma_podman_args_use_build_args(self):
         from e2e import prisma_engines
         args = prisma_engines.podman_args(self.tmp)
         self.assertFalse([a for a in args if a.startswith("--env")])
-        self.assertTrue(any(a.startswith("--volume=") for a in args))
-        self.assertTrue(any(a.startswith("--build-arg=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/") for a in args))
-        self.assertTrue(any(a.startswith("--build-arg=PRISMA_SCHEMA_ENGINE_BINARY=/ota-prisma/") for a in args))
+        self.assertEqual(args, ["--build-arg=PRISMA_ENGINES_MIRROR=http://127.0.0.1:8765"])
+        self.assertEqual(prisma_engines.podman_args(self.tmp, 9000),
+                         ["--build-arg=PRISMA_ENGINES_MIRROR=http://127.0.0.1:9000"])
 
     def test_rewrite_args_substitutes_file(self):
         (self.tmp / "ctx").mkdir()
