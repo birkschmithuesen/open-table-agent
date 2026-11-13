@@ -2,7 +2,7 @@
 """Prisma engines for the patched-Teable build, fetched only via the download broker (spec D-2).
 
 Subcommands:
-  fetch [--cache DIR]          idempotent; prints ENGINE lines and one PODMAN_ARGS line (mode env)
+  fetch [--cache DIR]          idempotent; prints ENGINE lines and one PODMAN_ARGS line (mode build-arg)
   serve [--cache DIR] --port N serve the cache in mirror layout (fallback a)
   build-with-mirror            serve + run scripts/sync-upstream.py --build against the mirror
 """
@@ -26,7 +26,7 @@ HASH = "4123509d24aa4dede1e864b46351bf2790323b69"
 PLATFORM = "debian-openssl-3.0.x"
 BASE = f"https://binaries.prisma.sh/all_commits/{HASH}/{PLATFORM}"
 DEFAULT_CACHE = ROOT / ".work" / "prisma-engines"
-DEFAULT_MODE = "env"  # measured 2026-11-13 (probe through e2e/bin/podman build shim): env mode works
+DEFAULT_MODE = "build-arg"  # build-only ARGs (e2e/build_shim.py declares them per stage); never baked into image ENV
 # (kind, gz file, engine file name)
 FILES = [
     ("query", "libquery_engine.so.node.gz", f"libquery_engine-{PLATFORM}.so.node"),
@@ -66,8 +66,8 @@ def podman_args(cache: Path) -> list[str]:
     eng = cache.resolve() / "engines"
     return [
         f"--volume={eng}:/ota-prisma:ro",
-        f"--env=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/libquery_engine-{PLATFORM}.so.node",
-        f"--env=PRISMA_SCHEMA_ENGINE_BINARY=/ota-prisma/schema-engine-{PLATFORM}",
+        f"--build-arg=PRISMA_QUERY_ENGINE_LIBRARY=/ota-prisma/libquery_engine-{PLATFORM}.so.node",
+        f"--build-arg=PRISMA_SCHEMA_ENGINE_BINARY=/ota-prisma/schema-engine-{PLATFORM}",
     ]
 
 

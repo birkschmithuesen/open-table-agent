@@ -3,6 +3,7 @@
 
 render(src, dst): copy a Dockerfile, dropping the `--link` flag from COPY/ADD lines (idempotent).
 `--link` only changes layer caching, not the resulting image. The source file is never modified.
+Declares the build-only ARGs (Prisma engine paths, node-gyp nodedir) after every FROM.
 Also rewrites a bare `RUN pnpm fetch` to first seed the pnpm store with the mounted xlsx tarball.
 
 CLI (used by e2e/bin/podman):
@@ -40,6 +41,24 @@ _RELINK = (
 )
 
 
+# Build-only values are passed as `--build-arg` (visible to RUN, never persisted into image ENV).
+# ARG scope is per stage, so each stage declares them right after its FROM.
+BUILD_ARGS = ("PRISMA_QUERY_ENGINE_LIBRARY", "PRISMA_SCHEMA_ENGINE_BINARY", "npm_config_nodedir")
+_FROM = re.compile(r"^\s*FROM\s", re.IGNORECASE)
+
+
+def _declare_args(lines: list[str]) -> list[str]:
+    decl = [f"ARG {a}\n" for a in BUILD_ARGS]
+    out: list[str] = []
+    for i, l in enumerate(lines):
+        out.append(l)
+        if _FROM.match(l) and [x.strip() for x in lines[i + 1:i + 1 + len(decl)]] != [d.strip() for d in decl]:
+            if not l.endswith("\n"):
+                out[-1] = l + "\n"
+            out.extend(decl)
+    return out
+
+
 def _fix_line(line: str) -> str:
     f = _FETCH.match(line)
     if f:  # seed the pnpm store so `pnpm fetch` finds xlsx (cdn.sheetjs.com is unreachable)
@@ -55,7 +74,7 @@ def _fix_line(line: str) -> str:
 def render(src: Path, dst: Path) -> Path:
     src, dst = Path(src), Path(dst)
     text = src.read_bytes().decode("utf-8")
-    out = "".join(_fix_line(l) for l in text.splitlines(keepends=True))
+    out = "".join(_declare_args([_fix_line(l) for l in text.splitlines(keepends=True)]))
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(out.encode("utf-8"))
     return dst
