@@ -41,6 +41,36 @@ class SyncUpstream(unittest.TestCase):
         self.assertIn(f"UPSTREAM {self.sha}", r.stdout)
         self.assertFalse((self.tmp / "upstream.lock.json").exists())
 
+    def test_ignores_local_branch_with_extra_commit(self):
+        import subprocess
+        cache = self.tmp / ".work" / "upstream.git"
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--dry-run")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # plant a local 'develop' in the cache that carries an extra commit (the teable-fork trap)
+        wt = self.tmp / "plant"
+        subprocess.run(["git", "clone", "-q", str(self.upstream), str(wt)], check=True)
+        (wt / "extra.txt").write_text("x")
+        subprocess.run(["git", "-C", str(wt), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(wt), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "local"], check=True)
+        subprocess.run(["git", "-C", str(wt), "push", "-q", str(cache), "HEAD:refs/heads/develop"], check=True)
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        self.assertIn(f"UPSTREAM {self.sha}", r.stdout)
+
+    def test_second_run_is_up_to_date(self):
+        a = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        lock1 = (self.tmp / "upstream.lock.json").read_text()
+        b = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        self.assertEqual((a.returncode, b.returncode), (0, 0))
+        self.assertIn(f"UP-TO-DATE {self.sha}", b.stdout)
+        self.assertEqual((self.tmp / "upstream.lock.json").read_text(), lock1)
+
+    def test_dry_run_leaves_no_trace(self):
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--dry-run")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("DRY-RUN ok", r.stdout)
+        self.assertFalse((self.tmp / "upstream.lock.json").exists())
+        self.assertEqual([p.name for p in (self.tmp / ".work").iterdir()], ["upstream.git"])
+
 
 if __name__ == "__main__":
     unittest.main()

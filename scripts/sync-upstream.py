@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch upstream Teable, apply patches/*.patch in a fresh worktree, record upstream.lock.json (spec §6)."""
 from __future__ import annotations
-import argparse, datetime, hashlib, json, re, subprocess, sys
+import argparse, datetime, hashlib, json, os, re, subprocess, sys
 from pathlib import Path
 
 DEFAULT_URL = "https://github.com/teableio/teable.git"
@@ -120,6 +120,34 @@ def build_lock(url: str, ref: str, sha: str, files: list[Path], hashes: list[str
     }
 
 
+def podman_build(build_cmd: list[str]) -> int:
+    try:
+        r = subprocess.run(build_cmd)
+    except FileNotFoundError:
+        return 127
+    return r.returncode
+
+
+def load_lock(lock_path: Path) -> dict | None:
+    if not lock_path.exists():
+        return None
+    try:
+        return json.loads(lock_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def is_up_to_date(existing: dict, url: str, ref: str, sha: str, hashes: list[str], existing_wt: Path) -> bool:
+    if existing.get("upstream") != {"url": url, "ref": ref, "sha": sha}:
+        return False
+    if [p.get("sha256") for p in existing.get("patches", [])] != hashes:
+        return False
+    if not existing_wt.exists():
+        return False
+    head = git("rev-parse", "HEAD", cwd=existing_wt, check=False).stdout.strip()
+    return head == existing.get("patched_commit")
+
+
 def run(argv: list[str]) -> int:
     args = parse_args(argv)
     git("--version")
@@ -134,6 +162,21 @@ def run(argv: list[str]) -> int:
     files = patch_files(Path(args.patches))
     hashes = [sha256(f) for f in files]
     tag = image_tag(sha, hashes)
+    podman_bin = os.environ.get("OTA_PODMAN", "podman")
+    lock_path = Path(args.lock)
+
+    if not args.dry_run:
+        existing = load_lock(lock_path)
+        existing_wt = work / f"teable-{sha[:12]}"
+        if existing is not None and is_up_to_date(existing, args.upstream_url, ref, sha, hashes, existing_wt):
+            print(f"UP-TO-DATE {sha}")
+            if args.build and not existing.get("image", {}).get("built", False):
+                build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, str(existing_wt)]
+                if podman_build(build_cmd) != 0:
+                    return 3
+                existing["image"]["built"] = True
+                write_lock(lock_path, existing)
+            return 0
 
     wt = work / (("dry-run-" if args.dry_run else "teable-") + sha[:12])
     fresh_worktree(cache, wt, sha)
@@ -154,12 +197,17 @@ def run(argv: list[str]) -> int:
         print("DRY-RUN ok")
         return 0
 
-    lock_path = Path(args.lock)
     lock = build_lock(args.upstream_url, ref, sha, files, hashes, patched, tag)
     write_lock(lock_path, lock)
 
-    build_cmd = ["podman", "build", "-f", "dockers/teable/Dockerfile", "-t", tag, str(wt)]
-    print("BUILD " + " ".join(build_cmd))
+    build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, str(wt)]
+    if args.build:
+        if podman_build(build_cmd) != 0:
+            return 3
+        lock["image"]["built"] = True
+        write_lock(lock_path, lock)
+    else:
+        print("BUILD " + " ".join(build_cmd))
     return 0
 
 
