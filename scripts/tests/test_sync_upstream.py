@@ -32,6 +32,15 @@ class SyncUpstream(unittest.TestCase):
         wt = self.tmp / ".work" / f"teable-{self.sha[:12]}"
         self.assertTrue((wt / "app" / "new.ts").exists())
 
+    def test_broken_context_reports_conflict(self):
+        from scripts.tests.fixtures import break_context
+        break_context(self.patches / "0001-demo.patch")
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"CONFLICT patch=0001-demo\.patch path=app/module\.ts hunk=@@ -\d+,\d+ \+\d+,\d+ @@")
+        self.assertIn(f"UPSTREAM {self.sha}", r.stdout)
+        self.assertFalse((self.tmp / "upstream.lock.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
