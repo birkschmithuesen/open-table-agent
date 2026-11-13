@@ -99,6 +99,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ref_group.add_argument("--tag")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--build", action="store_true")
+    p.add_argument("--podman-arg", action="append", default=[])
     p.add_argument("--work-dir", default=".work")
     p.add_argument("--lock", default="upstream.lock.json")
     p.add_argument("--patches", default="patches")
@@ -171,7 +172,7 @@ def run(argv: list[str]) -> int:
         if existing is not None and is_up_to_date(existing, args.upstream_url, ref, sha, hashes, existing_wt):
             print(f"UP-TO-DATE {sha}")
             if args.build and not existing.get("image", {}).get("built", False):
-                build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, str(existing_wt)]
+                build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, *args.podman_arg, str(existing_wt)]
                 if podman_build(build_cmd) != 0:
                     return 3
                 existing["image"]["built"] = True
@@ -200,7 +201,7 @@ def run(argv: list[str]) -> int:
     lock = build_lock(args.upstream_url, ref, sha, files, hashes, patched, tag)
     write_lock(lock_path, lock)
 
-    build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, str(wt)]
+    build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, *args.podman_arg, str(wt)]
     if args.build:
         if podman_build(build_cmd) != 0:
             return 3

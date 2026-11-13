@@ -71,6 +71,30 @@ class SyncUpstream(unittest.TestCase):
         self.assertFalse((self.tmp / "upstream.lock.json").exists())
         self.assertEqual([p.name for p in (self.tmp / ".work").iterdir()], ["upstream.git"])
 
+    def test_tag_and_usage_errors(self):
+        import subprocess
+        subprocess.run(["git", "-C", str(self.upstream), "-c", "tag.gpgsign=false", "tag", "release.test.1"], check=True)
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--tag", "release.test.1", "--dry-run")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        (self.tmp / "empty").mkdir()
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.tmp / "empty"), "--dry-run")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("sync-upstream: no NNNN-*.patch", r.stderr)
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--ref", "develop", "--tag", "x")
+        self.assertEqual(r.returncode, 2)
+
+    def test_build_failure_exit_3(self):
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--build",
+                     env_extra={"OTA_PODMAN": "false"})
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertFalse(json.loads((self.tmp / "upstream.lock.json").read_text())["image"]["built"])
+
+    def test_podman_args_pass_through(self):
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches),
+                     "--podman-arg=--volume=/x:/ota-prisma:ro", "--podman-arg=--env=A=b")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout, r"(?m)^BUILD podman build -f dockers/teable/Dockerfile -t \S+ --volume=/x:/ota-prisma:ro --env=A=b \S+$")
+
 
 if __name__ == "__main__":
     unittest.main()
