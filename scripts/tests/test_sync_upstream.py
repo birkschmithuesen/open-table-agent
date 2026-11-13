@@ -64,6 +64,18 @@ class SyncUpstream(unittest.TestCase):
         self.assertIn(f"UP-TO-DATE {self.sha}", b.stdout)
         self.assertEqual((self.tmp / "upstream.lock.json").read_text(), lock1)
 
+    def test_up_to_date_false_when_worktree_missing(self):
+        import shutil
+        a = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        self.assertEqual(a.returncode, 0, a.stdout + a.stderr)
+        wt = self.tmp / ".work" / f"teable-{self.sha[:12]}"
+        shutil.rmtree(wt)
+        b = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        self.assertEqual(b.returncode, 0, b.stdout + b.stderr)
+        self.assertNotIn("UP-TO-DATE", b.stdout)
+        self.assertIn("PATCHED", b.stdout)
+        self.assertTrue(wt.exists())
+
     def test_dry_run_leaves_no_trace(self):
         r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--dry-run")
         self.assertEqual(r.returncode, 0, r.stderr)
