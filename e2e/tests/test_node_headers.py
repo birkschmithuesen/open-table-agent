@@ -21,6 +21,20 @@ class NodeHeaders(unittest.TestCase):
         with self.assertRaises(SystemExit):
             nh.parse_shasums("zz  node-v1-headers.tar.gz\n", "node-v1-headers.tar.gz")
 
+    def test_expected_sha256_pinned_match(self):
+        v = "24.22.2"
+        good = f"{nh.PINNED_SHA256[v]}  node-v{v}-headers.tar.gz\n"
+        self.assertEqual(nh.expected_sha256(v, good), nh.PINNED_SHA256[v])
+
+    def test_expected_sha256_mismatch_exits(self):
+        v = "24.22.2"
+        with self.assertRaises(SystemExit):
+            nh.expected_sha256(v, f"{H}  node-v{v}-headers.tar.gz\n")
+
+    def test_expected_sha256_unpinned_exits(self):
+        with self.assertRaises(SystemExit):
+            nh.expected_sha256("1.2.3", f"{H}  node-v1.2.3-headers.tar.gz\n")
+
     def test_podman_args(self):
         a = nh.podman_args(Path("/h"), "24.22.2")
         self.assertEqual(a, ["--volume=/h:/ota-node-headers:ro",

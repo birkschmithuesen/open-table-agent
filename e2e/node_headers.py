@@ -3,9 +3,9 @@
 
 Under the build's local proxy node-gyp cannot download node-v<ver>-headers.tar.gz from nodejs.org
 (CONNECT refused; the optional `cpu-features` native build would be rolled back). Instead this fetches
-SHASUMS256.txt (--unverified: nodejs.org signs it only with a detached GPG signature we cannot check
-here; the tarball hash below is then the only chain) and the headers tarball (--sha256 from that file),
-extracts it, and prints one PODMAN_ARGS line: a read-only volume plus
+the headers tarball verified against the sha256 pinned in PINNED_SHA256 below (taken from nodejs.org's
+published SHASUMS256.txt for that version), cross-checks it against a freshly fetched SHASUMS256.txt
+(--unverified: only a detached GPG signature exists; a difference from the pin aborts), extracts it, and prints one PODMAN_ARGS line: a read-only volume plus
 `--build-arg=npm_config_nodedir=...` (declared as ARG per stage by e2e/build_shim.py; never image ENV).
 Idempotent.
 
@@ -25,6 +25,11 @@ DEFAULT_VERSION = "24.22.2"  # ARG NODE_VERSION of upstream dockers/teable/Docke
 DEFAULT_DIR = ROOT / ".work" / "node-headers"
 MOUNT = "/ota-node-headers"
 BASE = "https://nodejs.org/dist"
+# sha256 of node-v<ver>-headers.tar.gz, copied from https://nodejs.org/dist/v<ver>/SHASUMS256.txt.
+# Bumping DEFAULT_VERSION requires adding the new pin here.
+PINNED_SHA256 = {
+    "24.22.2": "c5cc7d27906f5b22405a24726a05b9a20c728360225aebed284836c4ae315af5",
+}
 
 
 def headers_name(version: str) -> str:
@@ -41,6 +46,17 @@ def parse_shasums(text: str, name: str) -> str:
                 return h
             break
     raise SystemExit(f"no valid sha256 for {name} in SHASUMS256.txt")
+
+
+def expected_sha256(version: str, shasums_text: str) -> str:
+    """The pinned sha256 for `version`; SystemExit if unpinned or if SHASUMS256.txt disagrees with the pin."""
+    pin = PINNED_SHA256.get(version)
+    if pin is None:
+        raise SystemExit(f"no pinned sha256 for node headers {version}; add it to PINNED_SHA256")
+    published = parse_shasums(shasums_text, headers_name(version))
+    if published != pin:
+        raise SystemExit(f"SHASUMS256.txt sha256 {published} differs from pinned {pin} for {headers_name(version)}")
+    return pin
 
 
 def sha256_file(p: Path) -> str:
@@ -79,7 +95,7 @@ def main(argv: list[str]) -> int:
     shasums, tgz = d / f"SHASUMS256-v{a.version}.txt", d / name
     marker = d / f"node-v{a.version}" / "include" / "node" / "common.gypi"
     broker(f"{BASE}/v{a.version}/SHASUMS256.txt", shasums, ["--unverified"])
-    expect = parse_shasums(shasums.read_text(), name)
+    expect = expected_sha256(a.version, shasums.read_text())
     if not (tgz.is_file() and sha256_file(tgz) == expect):
         broker(f"{BASE}/v{a.version}/{name}", tgz, ["--sha256", expect])
         if sha256_file(tgz) != expect:
