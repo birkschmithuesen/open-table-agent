@@ -10,6 +10,9 @@ ALLOWED = {
     "apps/nestjs-backend/src/features/base-sql-executor/base-sql-executor.module.ts",
     "apps/nestjs-backend/src/features/base/base.module.ts",
     "apps/nestjs-backend/test/admin/table-route-ledger.ts",
+    # 0002-nestjs-backend-v2-command-explain-dep.patch (spec §5.3)
+    "apps/nestjs-backend/package.json",
+    "pnpm-lock.yaml",
 }
 
 def series():
