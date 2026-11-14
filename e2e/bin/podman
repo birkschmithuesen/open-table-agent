@@ -13,7 +13,9 @@ if [ "${1:-}" = "build" ]; then
   [ "${#args[@]}" -gt 0 ] || exit 1
   set -- "${args[@]}"
 fi
-exec systemd-run --user --wait --collect --quiet --pipe -p NoNewPrivileges=no \
+# KillMode=process: rootlessport (the published-port forwarder, started by the infra container's podman call)
+# must outlive the transient unit, otherwise the pod's -p mapping silently stops listening.
+exec systemd-run --user --wait --collect --quiet --pipe -p NoNewPrivileges=no -p KillMode=process \
   --working-directory="$PWD" \
   -E CONTAINERS_STORAGE_CONF="${OTA_PODMAN_STORAGE_CONF:-$HOME/.hermes/profiles/birk/cache/scratch/podman/storage-vfs.conf}" \
   podman "$@"

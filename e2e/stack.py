@@ -93,6 +93,16 @@ def _started(a):
     return podman("container", "exists", name, check=False, capture=True).returncode == 0
 
 
+def wait_db(timeout=120):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        r = podman("exec", f"{POD}-db", "pg_isready", "-h", "127.0.0.1", "-U", "teable", check=False, capture=True)
+        if r.returncode == 0:
+            return
+        time.sleep(2)
+    raise RuntimeError(f"postgres not ready after {timeout}s")
+
+
 def pod_exists():
     return podman("pod", "exists", POD, check=False, capture=True).returncode == 0
 
@@ -115,6 +125,8 @@ def up(timeout=TIMEOUT_S):
     try:
         ensure_infra_image()
         for a in run_args(tag, s):
+            if a[0] == "run" and a[-1] == tag:
+                wait_db()  # the teable entrypoint migrates once and exits if postgres is not accepting TCP yet
             r = podman(*a, check=False, capture=True)
             if r.returncode != 0 and not _started(a):
                 sys.stderr.write(r.stdout + r.stderr)
