@@ -3,7 +3,7 @@ E2E_TARGETS += e2e-sync e2e-run e2e-shim e2e-boot
 e2e-boot:
 	python3 -m unittest -v e2e.tests.test_boot
 e2e-shim:
-	python3 -m unittest -v e2e.tests.test_build_shim e2e.tests.test_apt_proxy
+	python3 -m unittest -v e2e.tests.test_build_shim e2e.tests.test_apt_proxy e2e.tests.test_node_headers e2e.tests.test_stack
 e2e-run: e2e/node_modules/.ota-stamp
 	python3 e2e/stack.py up || { python3 e2e/stack.py down; exit 1; }
 	python3 e2e/bootstrap.py > e2e/.env.e2e ; status=$$?; \
