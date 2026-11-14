@@ -1,6 +1,6 @@
 """Container-backed boot proof: the patched community image (patch 0002) starts and serves /health.
 
-Not part of TEST_TARGETS (needs podman and the built image); run via `make e2e-boot`.
+Not part of TEST_TARGETS (needs podman and the built image); run via `make e2e` (single-goal `make e2e-boot` is rejected by the top-level Makefile).
 Without patches/0002 the image dies at startup with
 "Attempted to resolve unregistered dependency token: Symbol(v2.commandExplain.previewPlannerRegistry)".
 """

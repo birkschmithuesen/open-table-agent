@@ -152,7 +152,6 @@ class Mirror(unittest.TestCase):
 
     def test_upstream_failure_is_refused_404(self):
         with self.assertRaises(ap.Refused) as cm:
-            self.get("/debian/dists/bookworm/InRelease.nope".replace(".nope", ""))  # not in remote? it is; use gpg-less suite
             self.m.get("deb.debian.org", "/debian/dists/other/InRelease")
         self.assertEqual(cm.exception.status, 404)
 
