@@ -2,6 +2,10 @@
 
 MCP server and a minimal patch set that give AI agents full access to a self-hosted open-source Teable (Community Edition).
 
+Not affiliated with, endorsed by, or sponsored by Teable, Inc. "Teable" is a trademark of Teable, Inc.
+(see their [LICENSE](https://github.com/teableio/teable/blob/develop/LICENSE), Section 7(e)); this project
+only targets the open-source Community Edition and carries no Teable brand assets.
+
 Status: implemented; see docs/hermes.md
 
 ## Build shim

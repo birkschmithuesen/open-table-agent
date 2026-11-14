@@ -4,6 +4,10 @@ An MCP server that gives an AI agent access to a self-hosted Teable instance. It
 stdio or stateless Streamable HTTP. Safety comes from the token you give it: all 12 tools are always
 listed, and a call the token may not make returns Teable's 403 as an error result.
 
+Targets Teable Community Edition (self-hosted, open-source). Not affiliated with, endorsed by, or
+sponsored by Teable, Inc. "Teable" is a trademark of Teable, Inc. (see their
+[LICENSE](https://github.com/teableio/teable/blob/develop/LICENSE), Section 7(e)).
+
 ## Install
 
 Requires Node.js 22 or newer.
