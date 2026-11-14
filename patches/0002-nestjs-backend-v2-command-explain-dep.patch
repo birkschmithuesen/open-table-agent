@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: "Robo (coder)" <robo@artesmobiles.art>
+Date: Sat, 14 Nov 2026 01:06:08 +0100
+Subject: [PATCH] fix(nestjs-backend): declare @teable/v2-command-explain
+ dependency
+
+Without the dependency the backend bundle inlines its own copy of
+@teable/v2-command-explain while @teable/v2-container-node loads the
+external dist copy, so two distinct Symbols exist for the preview planner
+registry token and startup fails with an unregistered dependency token.
+---
+ apps/nestjs-backend/package.json | 1 +
+ pnpm-lock.yaml                   | 3 +++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/apps/nestjs-backend/package.json b/apps/nestjs-backend/package.json
+index a36595db8..07026f5cb 100644
+--- a/apps/nestjs-backend/package.json
++++ b/apps/nestjs-backend/package.json
+@@ -194,6 +194,7 @@
+     "@teable/v2-adapter-table-query-ops-postgres": "workspace:^",
+     "@teable/v2-adapter-table-repository-postgres": "workspace:^",
+     "@teable/v2-adapter-undo-redo-keyv": "workspace:*",
++    "@teable/v2-command-explain": "workspace:*",
+     "@teable/v2-container-node": "workspace:*",
+     "@teable/v2-contract-http": "workspace:*",
+     "@teable/v2-contract-http-implementation": "workspace:*",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index a7cb1a2b1..31eb0aefd 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -303,6 +303,9 @@ importers:
+       '@teable/v2-adapter-undo-redo-keyv':
+         specifier: workspace:*
+         version: link:../../packages/v2/adapter-undo-redo-keyv
++      '@teable/v2-command-explain':
++        specifier: workspace:*
++        version: link:../../packages/v2/command-explain
+       '@teable/v2-container-node':
+         specifier: workspace:*
+         version: link:../../packages/v2/container-node
