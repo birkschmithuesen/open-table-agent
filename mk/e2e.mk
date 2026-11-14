@@ -1,5 +1,7 @@
-E2E_TARGETS += e2e-sync e2e-run e2e-shim
-.PHONY: e2e-run e2e-sync e2e-shim
+E2E_TARGETS += e2e-sync e2e-run e2e-shim e2e-boot
+.PHONY: e2e-run e2e-sync e2e-shim e2e-boot
+e2e-boot:
+	python3 -m unittest -v e2e.tests.test_boot
 e2e-shim:
 	python3 -m unittest -v e2e.tests.test_build_shim e2e.tests.test_apt_proxy
 e2e-run: e2e/node_modules/.ota-stamp

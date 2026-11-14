@@ -9,12 +9,16 @@
     {
       "file": "0001-sql-query-route.patch",
       "sha256": "4cba06ff7c97c2068221c1cf534e736e25c33613e9518c43b226023d4bdacbc1"
+    },
+    {
+      "file": "0002-nestjs-backend-v2-command-explain-dep.patch",
+      "sha256": "68ba89095533eb98c1a895b1e77a204028eed037e2781bfe1f30d69f2f76137e"
     }
   ],
-  "patched_commit": "b073c341ef9bb8ca58ffe025214fe6a961ea8de0",
+  "patched_commit": "5f6709c28275edbe3161ba15611130b75a6180a1",
   "image": {
-    "tag": "localhost/ota-teable:b8425f5a60d0-f98cea1e",
+    "tag": "localhost/ota-teable:b8425f5a60d0-ca8d2eb2",
     "built": true
   },
-  "generated_at": "2026-11-13T21:20:48Z"
+  "generated_at": "2026-11-14T00:16:46Z"
 }
