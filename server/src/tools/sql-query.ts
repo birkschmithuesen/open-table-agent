@@ -3,7 +3,7 @@ import { READ, type ToolDef } from "./types.js";
 
 export const tool: ToolDef = {
   name: "sql-query", title: "SQL query", annotations: READ,
-  description: "Run a read-only PostgreSQL query against a base. Address tables by the dbTableName from get-tables-meta, which already has the form <baseId>.<tableId>: quote each part, e.g. \"<baseId>\".\"<tableId>\". "
+  description: "Run a read-only PostgreSQL query against a base. Address tables by the dbTableName from get-tables-meta (schema-qualified <baseId>.<table>; the table part is not always the table id): quote each part, e.g. \"<baseId>\".\"<table part>\". "
     + "Columns are the quoted dbFieldName values from get-fields. "
     + "System columns: __id, __auto_number, __created_time, __last_modified_time, __created_by, __last_modified_by. "
     + "Always add a LIMIT. Timestamps are UTC. Use get-records when you need record IDs for writes.",
