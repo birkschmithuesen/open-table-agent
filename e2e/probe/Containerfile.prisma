@@ -1,0 +1,5 @@
+FROM docker.io/library/node:24.22.2-bookworm
+WORKDIR /p
+RUN test -r "$PRISMA_QUERY_ENGINE_LIBRARY" && test -x "$PRISMA_SCHEMA_ENGINE_BINARY" && echo "OTA-PROBE env+volume visible"
+COPY --link schema.prisma ./
+RUN npm init -y >/dev/null && npm install --no-audit --no-fund prisma@6.2.1 @prisma/client@6.2.1 && npx prisma generate --schema schema.prisma

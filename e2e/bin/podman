@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# podman shim: this shell has NoNewPrivs=1, so plain podman fails. Run it via a transient systemd user
+# unit with NoNewPrivileges=no. Storage driver stays vfs (storage-vfs.conf). Use it via
+#   OTA_PODMAN=<repo>/e2e/bin/podman  (scripts/sync-upstream.py)  or  PATH=<repo>/e2e/bin:$PATH.
+# `podman build -f <Dockerfile>` is rewritten to a derived file without `COPY --link`
+# (buildah 1.28 lacks it; see e2e/build_shim.py). The upstream Dockerfile is never touched.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "${1:-}" = "build" ]; then
+  rendered="$(mktemp)" || exit 1
+  python3 "$here/../build_shim.py" rewrite-args "$@" > "$rendered" || { rm -f "$rendered"; exit 1; }
+  mapfile -d '' args < "$rendered"
+  rm -f "$rendered"
+  [ "${#args[@]}" -gt 0 ] || exit 1
+  set -- "${args[@]}"
+fi
+# KillMode=process: rootlessport (the published-port forwarder, started by the infra container's podman call)
+# must outlive the transient unit, otherwise the pod's -p mapping silently stops listening.
+exec systemd-run --user --wait --collect --quiet --pipe -p NoNewPrivileges=no -p KillMode=process \
+  --working-directory="$PWD" \
+  -E CONTAINERS_STORAGE_CONF="${OTA_PODMAN_STORAGE_CONF:-$HOME/.hermes/profiles/birk/cache/scratch/podman/storage-vfs.conf}" \
+  podman "$@"

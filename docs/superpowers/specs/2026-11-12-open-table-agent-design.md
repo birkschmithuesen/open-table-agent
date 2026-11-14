@@ -266,6 +266,22 @@ line can conflict.
 AGPL-3.0 (same as upstream). The rest of this repository is MIT." plus how to regenerate (`git format-patch`
 from a worktree on `BASE`).
 
+### 5.3 `0002-nestjs-backend-v2-command-explain-dep.patch` content (AGPL-3.0)
+
+Added by Chain D with Birk's approval (operator note on card t_885a00f0, 2026-11-14 01:05). The upstream CE image
+fails at boot with an unregistered dependency token: the backend bundle inlines its own copy of
+`@teable/v2-command-explain` while `@teable/v2-container-node` loads the external dist copy, so two distinct
+Symbols exist for the preview planner registry token. The patch declares the dependency so only one copy exists:
+
+1. **Modify** `apps/nestjs-backend/package.json`: add `"@teable/v2-command-explain": "workspace:*"` to
+   `dependencies`.
+2. **Modify** `pnpm-lock.yaml`: add the matching `importers` entry
+   (`specifier: workspace:*`, `version: link:../../packages/v2/command-explain`).
+
+The boot proof is `e2e/tests/test_boot.py` (patched image boots without the DI error, `/health` reachable). Both
+files are large, frequently changing upstream files; a sync conflict here is expected to be a context-line
+conflict and is reported by C like any other. Drop this patch once upstream declares the dependency itself.
+
 ## 6. Part 3 — sync script (`scripts/sync-upstream.py`)
 
 Python 3.11 stdlib only (host has 3.11.15; testable with `unittest`, no deps).
@@ -359,7 +375,7 @@ the MUST. Test files are relative to their chain root.
 | S13 | startup without `TEABLE_URL` prints `open-table-agent: …` to stderr, exit 2 | swallow the error and exit 1 silently | `server/test/cli.test.ts` › "fails loudly without TEABLE_URL" |
 | P1 | patch applies cleanly to `patches/BASE` | change one context line in the patch's `base.module.ts` hunk | `patches/tests/test_patch_series.py` › `test_applies_to_base` |
 | P2 | route is `POST :baseId/sql-query` guarded by `@Permissions('base|query_data')` | change to `@Permissions('base|read')` | `patches/tests/test_patch_series.py` › `test_route_permission` |
-| P3 | patch touches only the 4 allow-listed paths | add a hunk to `app.module.ts` | `patches/tests/test_patch_series.py` › `test_touches_only_allowlisted_paths` |
+| P3 | the series touches only the 6 allow-listed paths (4 from 0001 in section 5.2, 2 from 0002 in section 5.3) | add a hunk to `app.module.ts` | `patches/tests/test_patch_series.py` › `test_touches_only_allowlisted_paths` |
 | P4 | `patches/README.md` states AGPL-3.0 | delete the AGPL sentence | `patches/tests/test_patch_series.py` › `test_readme_states_agpl` |
 | C1 | clean series → exit 0, lock with upstream sha + patch sha256 | skip writing `patches[]` | `scripts/tests/test_sync_upstream.py` › `test_clean_apply_writes_lock` |
 | C2 | broken hunk context → exit 1, `CONFLICT patch=… path=… hunk=…`, no lock | ignore `git am` exit status | `scripts/tests/test_sync_upstream.py` › `test_broken_context_reports_conflict` |
