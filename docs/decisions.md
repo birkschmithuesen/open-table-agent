@@ -24,3 +24,7 @@
 10. **festival-desk consumes this repo as a pinned dependency**, never as copied code: `deploy/teable/` builds
     the patched Teable via `scripts/sync-upstream`, the MCP server runs as its own service (or is started by
     Hermes), version pinned to a tag of this repo.
+11. **Auto `podman image prune -f` (dangling layers only) after every successful Chain-D build**
+    (Factory-lead/Birk ruling, 2026-11-20). Never `-a`, never `system prune`; a failed build leaves
+    everything untouched. See `scripts/podman_prune.py`, called from `e2e/stack.py` and
+    `scripts/sync-upstream.py --build`.
