@@ -18,6 +18,9 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+from podman_prune import prune_dangling_images  # noqa: E402
+
 PODMAN = os.path.join(HERE, "bin", "podman")
 POD = "ota-e2e"
 PORT = 3010
@@ -83,6 +86,8 @@ def ensure_infra_image():
     if podman("image", "exists", INFRA_IMAGE, check=False, capture=True).returncode != 0:
         infra = os.path.join(HERE, "infra")
         podman("build", "-t", INFRA_IMAGE, "-f", os.path.join(infra, "Containerfile"), infra, capture=True)
+        # podman() raises on a non-zero build, so reaching this line means the build succeeded.
+        prune_dangling_images(podman_bin=PODMAN)
 
 
 def _started(a):
