@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.tests.fixtures import make_upstream, make_patch, run_sync
+from scripts.tests.fixtures import make_fake_podman, make_upstream, make_patch, run_sync
 
 
 class SyncUpstream(unittest.TestCase):
@@ -100,6 +100,33 @@ class SyncUpstream(unittest.TestCase):
                      env_extra={"OTA_PODMAN": "false"})
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
         self.assertFalse(json.loads((self.tmp / "upstream.lock.json").read_text())["image"]["built"])
+
+    def test_build_success_prunes_dangling_images(self):
+        fake = make_fake_podman(self.tmp / "fake-podman", build_exit=0)
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--build",
+                     env_extra={"OTA_PODMAN": str(fake)})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        log = [json.loads(l) for l in fake.with_suffix(".log").read_text().splitlines()]
+        self.assertIn(["image", "prune", "-f"], log)
+
+    def test_build_failure_does_not_prune(self):
+        fake = make_fake_podman(self.tmp / "fake-podman", build_exit=1)
+        r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--build",
+                     env_extra={"OTA_PODMAN": str(fake)})
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        log = [json.loads(l) for l in fake.with_suffix(".log").read_text().splitlines()]
+        self.assertNotIn(["image", "prune", "-f"], log)
+
+    def test_up_to_date_rebuild_prunes_on_success(self):
+        a = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches))
+        self.assertEqual(a.returncode, 0, a.stdout + a.stderr)
+        fake = make_fake_podman(self.tmp / "fake-podman", build_exit=0)
+        b = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches), "--build",
+                     env_extra={"OTA_PODMAN": str(fake)})
+        self.assertEqual(b.returncode, 0, b.stdout + b.stderr)
+        self.assertIn(f"UP-TO-DATE {self.sha}", b.stdout)
+        log = [json.loads(l) for l in fake.with_suffix(".log").read_text().splitlines()]
+        self.assertIn(["image", "prune", "-f"], log)
 
     def test_podman_args_pass_through(self):
         r = run_sync(self.tmp, "--upstream-url", str(self.upstream), "--patches", str(self.patches),

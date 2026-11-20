@@ -63,6 +63,21 @@ def break_context(patch: Path) -> None:
     patch.write_text("".join(lines))
 
 
+def make_fake_podman(path: Path, build_exit: int = 0) -> Path:
+    """Fake podman binary: appends each invocation's argv (as a JSON line) to `<path>.log`.
+    Exits `build_exit` for `build`, 0 for everything else (including `image prune -f`)."""
+    log = path.with_suffix(".log")
+    path.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        f"with open({str(log)!r}, 'a') as f:\n"
+        "    f.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        f"sys.exit({build_exit} if sys.argv[1:2] == ['build'] else 0)\n"
+    )
+    path.chmod(0o755)
+    return path
+
+
 def run_sync(tmp: Path, *args: str, env_extra: dict | None = None) -> subprocess.CompletedProcess:
     env = dict(os.environ)
     if env_extra:

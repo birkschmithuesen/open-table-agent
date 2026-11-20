@@ -4,6 +4,9 @@ from __future__ import annotations
 import argparse, datetime, hashlib, json, os, re, subprocess, sys
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from podman_prune import prune_dangling_images  # noqa: E402
+
 DEFAULT_URL = "https://github.com/teableio/teable.git"
 IDENT = ["-c", "user.name=open-table-agent-sync", "-c", "user.email=sync@open-table-agent.invalid"]
 
@@ -175,6 +178,7 @@ def run(argv: list[str]) -> int:
                 build_cmd = [podman_bin, "build", "-f", "dockers/teable/Dockerfile", "-t", tag, *args.podman_arg, str(existing_wt)]
                 if podman_build(build_cmd) != 0:
                     return 3
+                prune_dangling_images(podman_bin=podman_bin)
                 existing["image"]["built"] = True
                 write_lock(lock_path, existing)
             return 0
@@ -205,6 +209,7 @@ def run(argv: list[str]) -> int:
     if args.build:
         if podman_build(build_cmd) != 0:
             return 3
+        prune_dangling_images(podman_bin=podman_bin)
         lock["image"]["built"] = True
         write_lock(lock_path, lock)
     else:
